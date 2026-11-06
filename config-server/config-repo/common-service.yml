@@ -1,0 +1,12 @@
+server:
+  port: 8085
+
+common:
+  excel:
+    max-file-size: 20971520
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB

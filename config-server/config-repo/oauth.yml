@@ -1,0 +1,9 @@
+server:
+  port: 8084
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: 3600000
+  service:
+    api-key: ${OAUTH_SERVICE_KEY}

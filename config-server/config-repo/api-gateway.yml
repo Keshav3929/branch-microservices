@@ -1,0 +1,34 @@
+server:
+  port: 8086
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: user-service
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/auth/**
+
+            - id: branch-service
+              uri: lb://BRANCH-SERVICE
+              predicates:
+                - Path=/branch/**,/notifications/**
+
+            - id: master-service
+              uri: lb://MASTER-SERVICE
+              predicates:
+                - Path=/dropdown/**
+
+            - id: common-service
+              uri: lb://COMMON-SERVICE
+              predicates:
+                - Path=/common/**
+
+app:
+  oauth:
+    service-key: ${OAUTH_SERVICE_KEY}
+  gateway:
+    internal-key: ${GATEWAY_INTERNAL_KEY}

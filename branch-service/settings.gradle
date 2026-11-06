@@ -1,0 +1,3 @@
+rootProject.name = 'branch-service'
+
+includeBuild('../common-service')

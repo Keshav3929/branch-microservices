@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: user-service
+  datasource:
+    url: jdbc:mysql://localhost:3306/branch_master
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+
+server:
+  port: 8083
+
+app:
+  oauth:
+    service-key: ${OAUTH_SERVICE_KEY}
