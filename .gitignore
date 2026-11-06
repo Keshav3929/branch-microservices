@@ -1,0 +1,22 @@
+# Gradle
+.gradle/
+**/build/
+
+# Java
+*.class
+*.jar
+*.war
+
+# Nodes
+node_modules/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Environment
+.env
+.env.*
+!.env.example
