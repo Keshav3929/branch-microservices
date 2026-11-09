@@ -585,7 +585,7 @@ export default function BranchManagement() {
                                     <TableRow><TableCell colSpan={excelCols.length + 2} align="center"> No invalid records </TableCell></TableRow>
                                 )}
                             </TableBody>
-                        </Table>
+                        </Table>npm
                     </TableContainer>
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>

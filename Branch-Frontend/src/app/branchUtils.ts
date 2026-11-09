@@ -1,4 +1,6 @@
 import { isAxiosError } from "axios";
+import type { BranchFilters, FilterChip } from "./pages/branch-filter";
+import type { DropdownOptions } from "./branchApi";
 
 export const NA = "N/A";
 
@@ -74,3 +76,36 @@ export const gridStyle = {
     gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
     gap: 2
 };
+
+
+export function getFilterChips(filters: BranchFilters, options: DropdownOptions): FilterChip[] {
+    const chips: FilterChip[] = [];
+    if (filters.createdDateFrom) {
+        chips.push({ key: "createdDateFrom", value: filters.createdDateFrom, label: `Created From: ${filters.createdDateFrom}` });
+    }
+    if (filters.createdDateTo) {
+        chips.push({ key: "createdDateTo", value: filters.createdDateTo, label: `Created To: ${filters.createdDateTo}` });
+    }
+
+    const configs: { key: keyof BranchFilters; label: string; list: (OptionItem | string)[] }[] = [
+        { key: "organizationId", label: "Organization", list: options.organizations },
+        { key: "regionId", label: "Region", list: options.regions },
+        { key: "branchType", label: "Branch Type", list: options.branchTypes },
+        { key: "status", label: "Status", list: ["Active", "Inactive"] },
+        { key: "countryId", label: "Country", list: options.countries }
+    ];
+
+    configs.forEach(({ key, label, list }) => {
+        const valArr = (filters[key] as (string | number)[]) ?? [];
+        valArr.forEach(val => {
+            const match = list.find(item => {
+                if (typeof item === "string") return item.toLowerCase() === String(val).toLowerCase();
+                return String(item.id) === String(val);
+            });
+            const display = match ? (typeof match === "string" ? match : match.name) : val;
+            chips.push({ key, value: val, label: `${label}: ${display}` });
+        });
+    });
+
+    return chips;
+}

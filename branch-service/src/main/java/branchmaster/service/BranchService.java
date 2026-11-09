@@ -159,9 +159,9 @@ public class BranchService {
         var organizationStats = branchRepository.countByOrganization().stream()
                 .map(row -> new BranchAnalyticsDto.OrganizationStats(
                         organizationNames.getOrDefault(((Number) row[0]).longValue(), "Unknown"), ((Number) row[1]).longValue())).toList();
-        var days = branchRepository.countByCreationDay().stream()
-                .map(row -> new BranchAnalyticsDto.MonthlyStats(row[0].toString(), ((Number) row[1]).longValue())).toList();
+        var creationTrends = branchRepository.countByCreationDay().stream()
+                .map(row -> new BranchAnalyticsDto.CreationStats(row[0].toString(), ((Number) row[1]).longValue())).toList();
         Map<String, Long> counts = counts(new BranchSearchRequestDto());
-        return new BranchAnalyticsDto(counts.get("total"), counts.get("active"), counts.get("inactive"), regions, types, organizationStats, days);
+        return new BranchAnalyticsDto(counts.get("total"), counts.get("active"), counts.get("inactive"), regions, types, organizationStats, creationTrends);
     }
 }

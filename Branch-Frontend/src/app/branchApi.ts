@@ -25,7 +25,7 @@ export interface BranchAnalytics extends Counts {
     branchesByRegion: { name: string; active: number; inactive: number }[];
     branchesByType: { name: string; count: number }[];
     branchesByOrganization: { name: string; count: number }[];
-    monthlyCreations: { month: string; count: number }[];
+    creationTrends: { month: string; count: number }[];
 }
 export interface UserOption {
     id: number;
