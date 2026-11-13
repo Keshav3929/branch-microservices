@@ -1,6 +1,9 @@
 import { isAxiosError } from "axios";
+import { utils, writeFile, type WorkBook } from "xlsx-js-style";
 import type { BranchFilters, FilterChip } from "./pages/branch-filter";
-import type { DropdownOptions } from "./branchApi";
+import type { DropdownOptions, UserOption } from "./branchApi";
+import { getUserName } from "./branchApi";
+import type { Branch } from "../types/BranchSchema";
 
 export const NA = "N/A";
 
@@ -77,7 +80,6 @@ export const gridStyle = {
     gap: 2
 };
 
-
 export function getFilterChips(filters: BranchFilters, options: DropdownOptions): FilterChip[] {
     const chips: FilterChip[] = [];
     if (filters.createdDateFrom) {
@@ -109,3 +111,102 @@ export function getFilterChips(filters: BranchFilters, options: DropdownOptions)
 
     return chips;
 }
+
+export const viewCols = [
+    ["Branch Code", "branchCode"], ["Branch Name", "branchName"], ["Communication Name", "communicationName"], ["Organization", "organizationId"],
+    ["Branch Type", "branchType"], ["Working Hours", "workingHoursId"], ["Region", "regionId"], ["Country", "countryId"], ["State", "stateId"],
+    ["City", "cityId"], ["Area", "area"], ["Zip Code", "zipCode"], ["Latitude", "latitude"], ["Longitude", "longitude"],
+    ["Address Line 1", "address1"], ["Address Line 2", "address2"], ["Contact Person", "contactPerson"], ["Mobile Number", "mobile"],
+    ["Telephone", "telephone"], ["Email ID", "email"], ["Working Days", "workingDays"], ["Departments", "departmentIds"], ["Services", "serviceIds"],
+    ["Status", "status"], ["Branch Logo", "branchLogo"], ["Supporting Documents", "documentPath"],
+    ["Remarks", "remarks"], ["Created By", "createdBy"], ["Created On", "createdAt"], ["Updated By", "updatedBy"], ["Updated On", "updatedAt"]
+] as const;
+
+export const mandatoryHeaders = new Set([
+    "Branch Code", "Branch Name", "Organization", "Branch Type",
+    "Region", "Country", "State", "City", "Address Line 1", "Status"
+]);
+
+export type OptionFields = Record<string, { id: number | string; name: string }[] | undefined>;
+
+export const getOptionFields = (options: DropdownOptions): OptionFields => ({
+    organizationId: options.organizations,
+    regionId: options.regions,
+    countryId: options.countries,
+    stateId: options.states,
+    cityId: options.cities,
+    contactPerson: options.contactPersons,
+    workingHoursId: options.workingHours
+});
+
+export const excelValue = (key: string, value: unknown, optionFields: OptionFields, users?: UserOption[]) => {
+    if (value == null || value === "") return "";
+    const option = optionFields[key]?.find(item => Number(item.id) === Number(value));
+    if (option) return option.name;
+    if (key === "status") return value === true || String(value).toLowerCase() === "true" ? "Active" : "Inactive";
+    if (key === "departmentIds" || key === "serviceIds") return parseIdList(value).join(", ");
+    if ((key === "createdBy" || key === "updatedBy") && users?.length) {
+        return getUserName(Number(value), users);
+    }
+    return String(value);
+};
+
+export const formatBranchWorkbook = (workbook: WorkBook) => {
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!sheet) throw new Error("Excel sheet not found");
+    const headers = utils.sheet_to_json<string[]>(sheet, { header: 1 })[1] ?? utils.sheet_to_json<string[]>(sheet, { header: 1 })[0];
+    if (!headers?.length) throw new Error("Template headers not found");
+    headers.forEach((header, i) => {
+        const mandatory = String(header).endsWith("*");
+        const labelAddress = utils.encode_cell({ r: 0, c: i });
+        const headerAddress = utils.encode_cell({ r: 1, c: i });
+        sheet[labelAddress] ??= { t: "s", v: mandatory ? "Mandatory" : "Optional" };
+        sheet[headerAddress] ??= { t: "s", v: String(header) };
+        sheet[labelAddress].v = mandatory ? "Mandatory" : "Optional";
+        sheet[labelAddress].s = {
+            font: { bold: true, color: { rgb: mandatory ? "FFFF0000" : "FF008000" } },
+            alignment: { horizontal: "center" }
+        };
+        sheet[headerAddress].s = {
+            fill: { patternType: "solid", fgColor: { rgb: "FF0F172A" } },
+            font: { bold: true, color: { rgb: "FFFFFFFF" } },
+            alignment: { horizontal: "center", vertical: "center", wrapText: true }
+        };
+        sheet["!cols"] ??= [];
+        sheet["!cols"][i] = { wch: 20 };
+    });
+    sheet["!ref"] = utils.encode_range({
+        s: { r: 0, c: 0 },
+        e: { r: Math.max(1, utils.decode_range(sheet["!ref"] ?? "A1").e.r), c: headers.length - 1 }
+    });
+    sheet["!rows"] = [{ hpt: 22 }, { hpt: 32 }];
+    sheet["!freeze"] = { xSplit: 0, ySplit: 2 };
+    return workbook;
+};
+
+export const downloadExcel = (rows: Record<string, unknown>[], headers: string[], filename: string, sheetName: string) => {
+    const displayHeaders = headers.map(header => mandatoryHeaders.has(header) ? `${header}*` : header);
+    const workbook = utils.book_new();
+    const sheet = utils.aoa_to_sheet([
+        displayHeaders.map(header => header.endsWith("*") ? "Mandatory" : "Optional"),
+        displayHeaders,
+        ...rows.map(row => displayHeaders.map(header => row[header.replace(/\*$/, "")] ?? row[header] ?? ""))
+    ]);
+    utils.book_append_sheet(workbook, sheet, sheetName);
+    formatBranchWorkbook(workbook);
+    writeFile(workbook, filename);
+};
+
+export const exportBranchExcel = (
+    branches: Branch[],
+    options: DropdownOptions,
+    users: UserOption[] = [],
+    filename = "branches.xlsx",
+    sheetName = "Branches"
+) => {
+    const optionFields = getOptionFields(options);
+    const rows = branches.map(branch =>
+        Object.fromEntries(viewCols.map(([label, key]) => [label, excelValue(key, branch[key as keyof Branch], optionFields, users)]))
+    );
+    downloadExcel(rows, viewCols.map(([label]) => label), filename, sheetName);
+};

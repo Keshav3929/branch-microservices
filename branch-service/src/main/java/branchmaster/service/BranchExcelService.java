@@ -7,12 +7,7 @@ import branchmaster.exception.BranchException;
 import branchmaster.repository.BranchRepository;
 import commonservice.service.CommonValidationService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import branchmaster.client.CommonExcelClient;
-import branchmaster.dto.CommonExcelTemplateRequest;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -24,29 +19,10 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class BranchExcelService {
 
-    private static final List<String> HEADERS = List.of(
-            "Branch Code*", "Branch Name*", "Communication Name",
-            "Organization*", "Branch Type*", "Region*", "Country*", "State*", "City*",
-            "Area", "Zip Code", "Address Line 1*", "Address Line 2",
-            "Latitude", "Longitude", "Contact Person", "Mobile Number", "Telephone",
-            "Email ID", "Working Days", "Working Hours", "Departments", "Services",
-            "Status*", "Branch Logo", "Supporting Documents", "Remarks"
-    );
-
-    private final CommonExcelClient commonExcelClient;
     private final BranchRepository branchRepository;
     private final CommonValidationService commonValidationService;
 
-    public ResponseEntity<byte[]> downloadTemplate() {
-        byte[] file = commonExcelClient.generateTemplate(
-                new CommonExcelTemplateRequest("Branch Template",HEADERS));
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=branch-template.xlsx")
-                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                .body(file);
-    }
-
-    public BranchImportRowValidationDto validateMultiple(List<BranchRequestDto> requests) {
+        public BranchImportRowValidationDto validateMultiple(List<BranchRequestDto> requests) {
         if (requests == null || requests.isEmpty()) { throw new BranchException(BranchException.Type.INVALID_ROW); }
 
         List<BranchImportRowDto> valid = new ArrayList<>();

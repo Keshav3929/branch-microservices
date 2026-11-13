@@ -11,9 +11,9 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs, { type Dayjs } from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
-import MultiSelectAutoComplete from "./MultiSelectAutoComplete";
-import type { BranchFilters } from "../app/pages/branch-filter";
-import type { DropdownOptions } from "../app/branchApi";
+import MultiSelectAutoComplete from "../../components/MultiSelectAutoComplete";
+import type { BranchFilters } from "./branch-filter";
+import type { DropdownOptions } from "../branchApi";
 
 dayjs.extend(customParseFormat);
 export const DATE_FMT = "DD-MM-YYYY";
@@ -26,22 +26,13 @@ const formatDate = (d: Dayjs) => d.format(DATE_FMT);
 
 interface Option { id: number | string; name: string; }
 const toIds = (val: unknown): (string | number)[] =>
-    (Array.isArray(val) ? val : [val])
-        .filter(v => v != null && v !== "")
-        .map(v => typeof v === "object" ? (v as Option).id : v as string | number);
-
-const gridStyle = {
-    display: "grid",
-    gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(4, minmax(0, 1fr))" },
-    gap: 2
-};
-
+    (Array.isArray(val) ? val : [val]).filter(v => v != null && v !== "").map(v => typeof v === "object" ? (v as Option).id : v as string | number);
+const gridStyle = { display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(4, minmax(0, 1fr))" }, gap: 2};
 const popperSx = {
     "& .MuiDateCalendar-root": { height: "auto", paddingBottom: 0 },
     "& .MuiPickersLayout-contentWrapper": { paddingBottom: 0 },
     "& .MuiPickersLayout-actionBar": { paddingTop: 0, paddingBottom: "2px", minHeight: "auto", marginTop: "-18px" }
 };
-
 const pickerErrors: Record<string, string> = {
     invalidDate: "Enter a valid date in DD-MM-YYYY format",
     maxDate: "Future dates are not allowed",
@@ -83,20 +74,17 @@ export default function DashboardFilterBar({
             return pickerErrors.minDate;
         return "";
     };
-
     const updateDate = (field: DateKey, date: Dayjs | null) => {
         const error = validateDate(field, date);
         if (error) return setError(field, error);
         set({ [field]: date ? formatDate(date.startOf("day")) : "" });
         setError(field, "");
     };
-
     const dateKeyDown = (event: KeyboardEvent) => {
         if (event.ctrlKey || event.metaKey || event.altKey ||
             ["Backspace", "Delete", "Tab", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "Enter"].includes(event.key)) return;
         if (!/^[0-9/-]$/.test(event.key)) event.preventDefault();
     };
-
     const setQuickRange = (range: "today" | "7days" | "30days" | "thisMonth" | "thisYear" | "all") => {
         const now = dayjs();
         let from = "";
@@ -111,31 +99,15 @@ export default function DashboardFilterBar({
         setFilters(next);
         onApply(next);
     };
-
     const datePicker = (field: DateKey, label: string) => (
-        <DatePicker
-            label={label}
-            value={dates[field]}
-            format={DATE_FMT}
-            views={["year", "month", "day"]}
-            openTo="day"
-            maxDate={today()}
-            minDate={field === "createdDateTo" ? fromDate ?? undefined : undefined}
+        <DatePicker label={label} value={dates[field]} format={DATE_FMT} views={["year", "month", "day"]} openTo="day" maxDate={today()} minDate={field === "createdDateTo" ? fromDate ?? undefined : undefined}
             onChange={date => updateDate(field, date)}
             onError={reason => {
                 if (!reason) setError(field, "");
                 else if (pickerErrors[reason]) setError(field, pickerErrors[reason]);
             }}
-            slotProps={{
-                actionBar: { actions: ["today"], sx: { m: 0, p: 0.5 } },
-                popper: { sx: popperSx },
-                textField: {
-                    size: "small",
-                    fullWidth: true,
-                    error: !!errors[field],
-                    helperText: errors[field],
-                    onKeyDown: dateKeyDown
-                }
+            slotProps={{ actionBar: { actions: ["today"], sx: { m: 0, p: 0.5 } }, popper: { sx: popperSx },
+                textField: { size: "small", fullWidth: true, error: !!errors[field], helperText: errors[field], onKeyDown: dateKeyDown }
             }}
         />
     );

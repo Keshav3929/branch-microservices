@@ -7,17 +7,18 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import FilterListIcon from "@mui/icons-material/FilterList";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import BranchHeader from "../../components/Header";
 import ColumnChart from "../../components/ColumnChart";
 import PieChart from "../../components/PieChart";
 import GaugeChart from "../../components/GaugeChart";
 import DashboardChartCard from "../../components/DashboardChartCard";
 import DashboardStatTiles from "../../components/DashboardStatTiles";
-import DashboardFilterBar from "../../components/DashboardFilterBar";
+import DashboardFilterBar from "./dashboard-filter";
 import BranchDrilldownDialog from "../../components/BranchDrilldownDialog";
-import { getFilterChips } from "../branchUtils";
+import { getFilterChips, exportBranchExcel } from "../branchUtils";
 import { getAnalytics, getDropdownOptions, getUsers, searchBranches, getBranches } from "../branchApi";
-import type { BranchAnalytics, DropdownOptions, UserOption, BranchSearchRequest} from "../branchApi";
+import type { BranchAnalytics, DropdownOptions, UserOption, BranchSearchRequest } from "../branchApi";
 import type { Branch } from "../../types/BranchSchema";
 import type { ChartEngine, TableBreakdownRow, DrilldownPayload } from "../../types/chartTypes";
 import type { BranchFilters, FilterChip } from "./branch-filter";
@@ -69,13 +70,14 @@ function computeAnalytics(branches: Branch[], options: DropdownOptions): BranchA
         branchesByRegion: Array.from(regMap.values()),
         branchesByOrganization: Array.from(orgMap.values()),
         branchesByType: Array.from(typeMap, ([name, count]) => ({ name, count })),
-        creationTrends: Array.from(trendsMap, ([month, count]) => ({ month, count })).sort((a, b) => a.month.localeCompare(b.month))
+        creationTrends: Array.from(trendsMap, ([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date))
     };
 }
 
 export default function BranchDashboard() {
     const [engine, setEngine] = useState<ChartEngine>("recharts");
     const [analytics, setAnalytics] = useState<BranchAnalytics | null>(null);
+    const [overallAnalytics, setOverallAnalytics] = useState<BranchAnalytics | null>(null);
     const [allBranches, setAllBranches] = useState<Branch[]>([]);
     const [loading, setLoading] = useState(true);
     const [failed, setFailed] = useState(false);
@@ -88,24 +90,28 @@ export default function BranchDashboard() {
     const [drilldownOpen, setDrilldownOpen] = useState(false);
     const isInitialMount = useRef(true);
 
-    // Initial load: Runs exactly ONCE on mount
+    // Initial load: Fetch analytics first, then use its actual total for branches
     useEffect(() => {
         const controller = new AbortController();
-        Promise.all([
-            getDropdownOptions(),
-            getUsers(),
-            getAnalytics(controller.signal),
-            getBranches({ page: 0, size: 5000 }, controller.signal)
-        ]).then(([optRes, userRes, analyticsRes, branchRes]) => {
-            setOptionsData(optRes.data);
-            setUsers(userRes.data);
-            setAnalytics(analyticsRes.data);
-            setAllBranches(branchRes.data?.content ?? []);
-            setLoading(false);
-        }).catch(err => {
-            if (!isCancel(err)) setFailed(true);
-            setLoading(false);
-        });
+        const loadDashboard = async () => {
+            try {
+                const [optRes, userRes, analyticsRes] = await Promise.all([getDropdownOptions(), getUsers(), getAnalytics(controller.signal)]);
+                if (controller.signal.aborted) return;
+                const analyticsData = analyticsRes.data;
+                setOptionsData(optRes.data);
+                setUsers(userRes.data);
+                setAnalytics(analyticsData);
+                setOverallAnalytics(analyticsData);
+                const branchRes = await getBranches({ page: 0, size: Math.max(analyticsData.total || 1, 1) }, controller.signal);
+                if (controller.signal.aborted) return;
+                setAllBranches(branchRes.data?.content ?? []);
+            } catch (err) {
+                if (!isCancel(err)) setFailed(true);
+            } finally {
+                if (!controller.signal.aborted) setLoading(false);
+            }
+        };
+        loadDashboard();
         return () => controller.abort();
     }, []);
 
@@ -129,16 +135,23 @@ export default function BranchDashboard() {
         const controller = new AbortController();
         setLoading(true);
 
+        const pageSize = Math.max(overallAnalytics?.total ?? analytics?.total ?? 1, 1);
         const fetchPromise = hasFilter
-            ? searchBranches(searchReq, { page: 0, size: 5000 }, controller.signal)
-            : getBranches({ page: 0, size: 5000 }, controller.signal);
+            ? searchBranches(searchReq, { page: 0, size: pageSize }, controller.signal)
+            : getBranches({ page: 0, size: pageSize }, controller.signal);
 
         fetchPromise.then(res => {
             const list = res.data?.content ?? [];
             setAllBranches(list);
-            setAnalytics(hasFilter ? computeAnalytics(list, optionsData) : null);
-            if (!hasFilter) {
-                getAnalytics(controller.signal).then(aRes => setAnalytics(aRes.data)).catch(() => {});
+            if (hasFilter) {
+                setAnalytics(computeAnalytics(list, optionsData));
+            } else {
+                getAnalytics(controller.signal)
+                    .then(aRes => {
+                        setAnalytics(aRes.data);
+                        setOverallAnalytics(aRes.data);
+                    })
+                    .catch(() => { });
             }
             setLoading(false);
         }).catch(err => {
@@ -163,9 +176,7 @@ export default function BranchDashboard() {
         if (chip.key === "createdDateFrom" || chip.key === "createdDateTo") {
             next[chip.key] = "";
         } else {
-            (next[chip.key] as (string | number)[]) = (next[chip.key] as (string | number)[]).filter(
-                v => String(v) !== String(chip.value)
-            );
+            (next[chip.key] as (string | number)[]) = (next[chip.key] as (string | number)[]).filter(v => String(v) !== String(chip.value));
         }
         setFilters(next);
         setAppliedFilters(next);
@@ -209,17 +220,30 @@ export default function BranchDashboard() {
             list = list.filter(b => b.branchType === payload.value);
         } else if (payload.source === "trends") {
             const dateStr = String(payload.value ?? "");
-            list = list.filter(b => b.createdAt && b.createdAt.startsWith(dateStr));
+            const [year, month, day] = dateStr.split("-");
+            const selectedDate = `${day}/${month}/${year}`;
+            list = allBranches.filter(b => {
+                if (!b.createdAt) return false;
+                const branchDate = String(b.createdAt).split(" ")[0];
+                return branchDate === selectedDate;
+            });
         }
         setDrilldownBranches(list);
         setDrilldownOpen(true);
     }, [allBranches, optionsData]);
+
+    // Export filtered branches following the exact Branch download format
+    const handleExportDashboard = () => {
+        if (!allBranches.length) return;
+        exportBranchExcel(allBranches, optionsData, users, "dashboard-branches.xlsx", "Branches");
+    };
+
     // Applied Filter Chips computed from appliedFilters
-    const appliedChips = useMemo(() => getFilterChips(appliedFilters, optionsData), [appliedFilters, optionsData]);
+    const appliedChips = useMemo(() => getFilterChips(appliedFilters, optionsData), [appliedFilters, optionsData, overallAnalytics?.total]);
     // Table Data for the 5 Graph Cards
     const total = analytics?.total || 1;
     const trendsTableData: TableBreakdownRow[] = useMemo(() =>
-        analytics?.creationTrends?.map(item => ({ category: item.month, count: item.count })) ?? [], [analytics]);
+        analytics?.creationTrends?.map(item => ({ category: item.date, count: item.count })) ?? [], [analytics]);
     const orgTableData: TableBreakdownRow[] = useMemo(() =>
         analytics?.branchesByOrganization?.map(item => ({
             category: item.name, count: item.count, percentage: `${((item.count / total) * 100).toFixed(1)}%`
@@ -257,7 +281,7 @@ export default function BranchDashboard() {
                     {(appliedFilters.createdDateFrom || appliedFilters.createdDateTo) ? (
                         <Chip label={`From: ${appliedFilters.createdDateFrom || "Start"}  To: ${appliedFilters.createdDateTo || "Now"}`} size="small" sx={{ fontWeight: 600, bgcolor: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1" }} />
                     ) : (
-                        <Chip label="All Time Records" size="small" sx={{ fontWeight: 600, bgcolor: "#f1f5f9", color: "#334155" }}/>
+                        <Chip label="All Time Records" size="small" sx={{ fontWeight: 600, bgcolor: "#f1f5f9", color: "#334155" }} />
                     )}
                     <Tooltip title="Refresh Dashboard Page">
                         <IconButton size="small" onClick={() => window.location.reload()} sx={{ border: "1px solid #cbd5e1", bgcolor: "#fff", "&:hover": { bgcolor: "#f1f5f9" } }}>
@@ -276,9 +300,9 @@ export default function BranchDashboard() {
 
             {/* KPI Stat Tiles: Click tile to filter Status */}
             <DashboardStatTiles
-                total={analytics?.total ?? 0}
-                active={analytics?.active ?? 0}
-                inactive={analytics?.inactive ?? 0}
+                total={overallAnalytics?.total ?? 0}
+                active={overallAnalytics?.active ?? 0}
+                inactive={overallAnalytics?.inactive ?? 0}
                 activeStatusFilter={activeTileStatus}
                 onTileClick={handleTileClick}
             />
@@ -309,7 +333,10 @@ export default function BranchDashboard() {
                                 />
                             ))}
                         </Stack>
-                        <Button size="small" variant="text" color="error" onClick={handleResetFilters} sx={{ fontSize: "0.75rem", p: 0.5, minWidth: 0, textTransform: "none", fontWeight: 700 }}> Clear All </Button>
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                            <Button size="small" variant="text" startIcon={<FileDownloadIcon fontSize="small" />} onClick={handleExportDashboard} sx={{ fontSize: "0.75rem", p: 0.5, minWidth: 0, textTransform: "none", fontWeight: 700, color: "#17324d" }}> Export ({allBranches.length}) </Button>
+                            <Button size="small" variant="text" color="error" onClick={handleResetFilters} sx={{ fontSize: "0.75rem", p: 0.5, minWidth: 0, textTransform: "none", fontWeight: 700 }}> Clear All </Button>
+                        </Stack>
                     </Stack>
                 </Paper>
             )}

@@ -42,8 +42,6 @@ const headCellSx = {
     "& .MuiInput-underline:hover:not(.Mui-disabled):before, & .MuiInput-underline:after": { borderBottomColor: "#fff" }
 };
 
-// Keeps the cell on one line, cut off with "…" at the column width.
-// The tooltip with the full text appears only when the content is actually cut off.
 const CELL_PADDING = 32;
 function TruncatedCell({ title, width, children }: { title: string; width: number; children: ReactNode }) {
     const ref = useRef<HTMLDivElement>(null);
@@ -57,18 +55,10 @@ function TruncatedCell({ title, width, children }: { title: string; width: numbe
 
     return (
         <Tooltip title={overflowing ? title : ""} placement="top" arrow enterDelay={200}>
-            <Box
-                ref={ref}
-                onMouseEnter={check}
-                sx={{
-                    display: "block", maxWidth: Math.max(width - CELL_PADDING, 40),
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    // custom cell content (e.g. the history highlight box) is kept on one line as well
-                    "& > *": {
-                        whiteSpace: "nowrap !important", overflowWrap: "normal !important",
-                        overflow: "hidden !important", textOverflow: "ellipsis !important"
-                    }
-                }}
+            <Box ref={ref} onMouseEnter={check} sx={{
+                display: "block", maxWidth: Math.max(width - CELL_PADDING, 40), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                "& > *": { whiteSpace: "nowrap !important", overflowWrap: "normal !important", overflow: "hidden !important", textOverflow: "ellipsis !important" }
+            }}
             >
                 {children}
             </Box>
@@ -94,7 +84,6 @@ function DataTable<TData extends object>({
                 const value = props.cell.getValue();
                 if (isBlank(value)) return "N/A";
                 const content = originalCell ? originalCell(props) : value as ReactNode;
-                // only text and numbers get a tooltip (not booleans or buttons)
                 const text = typeof value === "string" || typeof value === "number" ? String(value) : "";
                 return text
                     ? <TruncatedCell title={text} width={props.column.getSize()}>{content}</TruncatedCell>
@@ -127,10 +116,7 @@ function DataTable<TData extends object>({
         muiSearchTextFieldProps: {
             onFocus: () => setSearchFocused(true),
             onBlur: () => setSearchFocused(false),
-            sx: {
-                minWidth: 300, width: 300,
-                "& .MuiInputAdornment-root": { visibility: searchFocused ? "visible" : "hidden" }
-            }
+            sx: { minWidth: 300, width: 300, "& .MuiInputAdornment-root": { visibility: searchFocused ? "visible" : "hidden" } }
         },
         ...(serverSide && {
             manualPagination: true,
@@ -153,10 +139,7 @@ function DataTable<TData extends object>({
     return (
         <>
             {title && (
-                <Box sx={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    px: 2, py: 1.5, bgcolor: "#0f172a", color: "#fff", borderRadius: "4px 4px 0 0"
-                }}>
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", px: 2, py: 1.5, bgcolor: "#0f172a", color: "#fff", borderRadius: "4px 4px 0 0" }}>
                     <Typography fontWeight={700}>{title}</Typography>
                     <Typography variant="body2">{total} {total === 1 ? "record" : "records"}</Typography>
                 </Box>
@@ -165,5 +148,4 @@ function DataTable<TData extends object>({
         </>
     );
 }
-
 export default DataTable;

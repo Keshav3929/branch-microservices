@@ -18,21 +18,23 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/common/excel")
 public class ExcelController {
 
-    private static final MediaType XLSX = MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    private static final MediaType XLSX = MediaType.parseMediaType( "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" );
     private final ExcelService excelService;
     private final ExcelValidationService validationService;
 
     @PostMapping("/template")
-    public ResponseEntity<byte[]> generateTemplate(
-            @Valid @RequestBody ExcelTemplateRequestDto request) throws IOException {
+    public ResponseEntity<byte[]> generateTemplate( @Valid @RequestBody ExcelTemplateRequestDto request)
+            throws IOException {
+        String fileName = request.templateType().trim().toLowerCase(Locale.ROOT) + "-template.xlsx";
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=template.xlsx")
+                .header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=\"" + fileName + "\"")
                 .contentType(XLSX)
                 .body(excelService.generateTemplate(request));
     }
@@ -43,6 +45,6 @@ public class ExcelController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(defaultValue = "true") boolean requireDataRows,
             @RequestParam(required = false) List<String> requiredHeaders) {
-        return validationService.validateFile(file, requireDataRows, requiredHeaders);
+        return validationService.validateFile( file, requireDataRows, requiredHeaders );
     }
 }

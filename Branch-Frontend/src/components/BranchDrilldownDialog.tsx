@@ -8,12 +8,12 @@ import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import type { MRT_ColumnDef, MRT_Row } from "material-react-table";
-import { utils, writeFile, WorkBook } from "xlsx-js-style";
 import DataTable from "./Table";
 import BranchHistoryDialog from "../app/pages/branch-history";
 import type { Branch } from "../types/BranchSchema";
 import type { DropdownOptions, UserOption } from "../app/branchApi";
 import { getUserName } from "../app/branchApi";
+import { exportBranchExcel } from "../app/branchUtils";
 
 export type BranchDrilldownDialogProps = {
     open: boolean;
@@ -27,7 +27,7 @@ export type BranchDrilldownDialogProps = {
 };
 
 const headProps = { sx: { backgroundColor: "#17324d", color: "#fff", textAlign: "center", "& .Mui-TableHeadCell-Content": { justifyContent: "center" }, "& .MuiTableSortLabel-root, & .MuiTableSortLabel-icon": { color: "#fff !important" } } };
-const bodyProps = { sx: { textAlign: "center", whiteSpace: "normal", wordBreak: "break-word" }};
+const bodyProps = { sx: { textAlign: "center", whiteSpace: "normal", wordBreak: "break-word" } };
 
 const StatusPill = ({ active }: { active: boolean }) => (
     <span className={`status-pill ${active ? "active" : "inactive"}`}>
@@ -57,7 +57,7 @@ export default function BranchDrilldownDialog({
                 <Button variant="text" size="small" onClick={() => setViewBranch(row.original)} sx={{ textTransform: "none", fontWeight: 700, minWidth: 0, p: 0, color: "primary.main", "&:hover": { textDecoration: "underline", bgcolor: "transparent" } }} > {row.original.branchCode} </Button>
             )
         },
-        { accessorKey: "branchName", header: "Branch Name", size: 180, enableSorting: true },
+        { accessorKey: "branchName", header: "Branch Name", size: 130, enableSorting: true },
         {
             id: "organizationId",
             header: "Organization",
@@ -85,7 +85,7 @@ export default function BranchDrilldownDialog({
         {
             accessorKey: "status",
             header: "Status",
-            size: 120,
+            size: 130,
             Cell: ({ row }: { row: MRT_Row<Branch> }) => <StatusPill active={!!row.original.status} />
         },
         {
@@ -94,7 +94,7 @@ export default function BranchDrilldownDialog({
             size: 120,
             accessorFn: (row: Branch) => getUserName(row.createdBy, users)
         },
-        { accessorKey: "createdAt", header: "Created At", size: 170, enableSorting: true }
+        { accessorKey: "createdAt", header: "Created At", size: 180, enableSorting: true }
     ].map(column => ({
         ...column,
         enableSorting: column.enableSorting ?? false,
@@ -102,30 +102,10 @@ export default function BranchDrilldownDialog({
         muiTableBodyCellProps: bodyProps
     })), [optionsData, users]);
 
-    // Download filtered branches
+    // Download filtered branches using exact Branch download format
     const handleDownloadExcel = () => {
         if (!branches.length) return;
-        const rows = branches.map(b => {
-            const org = optionsData.organizations.find(x => Number(x.id) === Number(b.organizationId))?.name ?? "";
-            const reg = optionsData.regions.find(x => Number(x.id) === Number(b.regionId))?.name ?? "";
-            const city = optionsData.cities.find(x => Number(x.id) === Number(b.cityId))?.name ?? "";
-            return {
-                "Branch Code": b.branchCode ?? "",
-                "Branch Name": b.branchName ?? "",
-                "Organization": org,
-                "Branch Type": b.branchType ?? "",
-                "Region": reg,
-                "City": city,
-                "Mobile": b.mobile ?? "",
-                "Email": b.email ?? "",
-                "Status": b.status ? "Active" : "Inactive",
-                "Created At": b.createdAt ?? ""
-            };
-        });
-        const workbook: WorkBook = utils.book_new();
-        const sheet = utils.json_to_sheet(rows);
-        utils.book_append_sheet(workbook, sheet, "Filtered Branches");
-        writeFile(workbook, `branches-drilldown.xlsx`);
+        exportBranchExcel(branches, optionsData, users, "branches.xlsx", "Filtered Branches");
     };
 
     return (

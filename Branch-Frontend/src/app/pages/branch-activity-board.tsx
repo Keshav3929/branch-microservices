@@ -18,10 +18,11 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import DomainIcon from "@mui/icons-material/Domain";
 import type { MRT_Row, MRT_ColumnDef, MRT_PaginationState, MRT_SortingState } from "material-react-table";
 import SearchForm, { DATE_FMT } from "./branch-filter";
 import type { BranchFilters, FilterChip } from "./branch-filter";
-import BranchHistoryDialog, { viewCols } from "./branch-history";
+import BranchHistoryDialog from "./branch-history";
 import DataTable from "../../components/Table";
 import AddForm from "./add-form";
 import UpdateForm from "./update-form";
@@ -31,7 +32,7 @@ import type { RootState, AppDispatch } from "../../redux/store";
 import { fetchBranches, setBranchLocally, removeBranchLocally } from "../../redux/branchSlice";
 import { deleteBranch, getSession, getCounts, saveBranches, validateExcelFile, getBranchTemplate, getDropdownOptions, getErrorMessage, getUsers, getUserName } from "../branchApi";
 import type { Counts, DropdownOptions, UserOption } from "../branchApi";
-import { parseIdList } from "../branchUtils";
+import { parseIdList, viewCols } from "../branchUtils";
 import type { Branch } from "../../types/BranchSchema";
 import BranchHeader from "../../components/Header";
 
@@ -392,14 +393,14 @@ export default function BranchManagement() {
                     {row.original.branchCode}
                 </Button>)
         },
-        { accessorKey: "branchName", header: "Branch Name", size: 200, enableSorting: true },
+        { accessorKey: "branchName", header: "Branch Name", size: 160, enableSorting: true },
         { id: "organizationId", header: "Organization", size: 140, accessorFn: (row: Branch) => optionsData.organizations.find(x => Number(x.id) === Number(row.organizationId))?.name },
         { accessorKey: "branchType", header: "Branch Type", enableSorting: true },
         { id: "regionId", header: "Region", size: 100, accessorFn: (row: Branch) => optionsData.regions.find(x => Number(x.id) === Number(row.regionId))?.name },
         { id: "cityId", header: "City", size: 150, accessorFn: (row: Branch) => optionsData.cities.find(x => Number(x.id) === Number(row.cityId))?.name },
         { accessorKey: "mobile", header: "Mobile", size: 150 },
         { accessorKey: "email", header: "Email", size: 230 },
-        { accessorKey: "status", header: "Status", size: 120, Cell: ({ row }: { row: MRT_Row<Branch> }) => <StatusPill active={!!row.original.status} /> },
+        { accessorKey: "status", header: "Status", size: 130, Cell: ({ row }: { row: MRT_Row<Branch> }) => <StatusPill active={!!row.original.status} /> },
         {
             id: "createdBy", header: "Created By", size: 100,
             accessorFn: (row: Branch) => getUserName(row.createdBy, users)
@@ -435,9 +436,17 @@ export default function BranchManagement() {
     return (
         <div className="branch-content-wrap">
             <BranchHeader />
-            <Card elevation={0} sx={{ my: 2, py: 2, px: 1, textAlign: "center", borderRadius: 4, color: "#fff", background: "linear-gradient(135deg, #d4dcf0 0%, #d0deecfb 55%, #d4dcf0 100%)", boxShadow: "0 10px 30px rgb(222, 238, 253)" }}>
-                <Typography variant="h3" className="app-header-title" sx={{ color: "#fff", fontWeight: 800, letterSpacing: 1.5, mb: 1 }}>  Branch Master  </Typography>
-                <Typography variant="subtitle1" className="app-header-subtitle" sx={{ color: "#dbeafe", fontWeight: 500, letterSpacing: 0.4 }}>  Manage branches. Monitor operations. Stay in control. </Typography>
+            {/* Branch Master Header Card */}
+            <Card elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, mb: 2.5, borderRadius: 3, border: "1px solid #e2e8f0", background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", display: "flex", flexDirection: { xs: "column", md: "row" }, alignItems: { xs: "flex-start", md: "center" }, justifyContent: "space-between", gap: 2 }}>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Box sx={{ width: 44, height: 44, borderRadius: 2.5, bgcolor: "#17324d", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(23, 50, 77, 0.25)" }}>
+                        <DomainIcon sx={{ fontSize: 24 }} />
+                    </Box>
+                    <Box>
+                        <Typography variant="h5" sx={{ fontWeight: 800, color: "#0f172a", letterSpacing: -0.5 }}>Branch Master</Typography>
+                        <Typography variant="body2" sx={{ color: "text.secondary", fontWeight: 500 }}>Manage branches, monitor operations, and organizational hierarchy</Typography>
+                    </Box>
+                </Stack>
             </Card>
             <div className="dashboard-top-grid">
                 <SearchForm filters={filters} appliedFilters={applied} setFilters={setFilters} onApply={handleApplyFilters} onReset={handleResetFilters} showMoreFilters={showMoreFilters} setShowMoreFilters={setShowMoreFilters} optionsData={optionsData}
@@ -455,9 +464,13 @@ export default function BranchManagement() {
                     )}
                     renderBelowFilters={
                         <Box sx={{ width: "100%", minWidth: 0 }}>
-                            <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+                            <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
                                 {([["all", "Since Beginning"], ["date", "By Chosen Date"]] as const).map(([id, label]) => (
-                                    <Button key={id} variant="text" size="small" onClick={() => switchScope(id)} sx={{ textTransform: "none", borderRadius: 0, fontWeight: scope === id ? 800 : 500, color: scope === id ? "#17324d" : "text.secondary", borderBottom: `2px solid ${scope === id ? "#17324d" : "transparent"}` }}> {label} </Button>
+                                    <Button key={id} variant={scope === id ? "contained" : "outlined"} size="small"
+                                        onClick={() => switchScope(id)}
+                                        sx={{ textTransform: "none", borderRadius: 2, px: 1.5, py: 0.4, fontSize: "0.76rem", fontWeight: 700, bgcolor: scope === id ? "#17324d" : "#fff", color: scope === id ? "#fff" : "#475569", borderColor: scope === id ? "#17324d" : "#cbd5e1", "&:hover": { bgcolor: scope === id ? "#0f2032" : "#f1f5f9", borderColor: scope === id ? "#0f2032" : "#94a3b8" } }}
+                                    > {label}
+                                    </Button>
                                 ))}
                             </Stack>
                             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 1, width: "100%", minWidth: 0 }}>

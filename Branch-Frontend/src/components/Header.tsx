@@ -9,19 +9,21 @@ import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import LogoutIcon from "@mui/icons-material/Logout";
 import SwitchAccountIcon from "@mui/icons-material/SwitchAccount";
+import MenuIcon from "@mui/icons-material/Menu";
+import MenuOpenIcon from "@mui/icons-material/MenuOpen";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import {
     getNotifications, getUnreadCount,
     markNotificationSeen, markAllNotificationsSeen,
     getSession, signOut
 } from "../app/branchApi";
 import type { BranchNotification } from "../app/branchApi";
-import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
-import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 
 export default function BranchHeader() {
     const session = getSession();
     const isAdmin = session?.role === "ADMIN";
-    const initials = session?.username.slice(0, 2).toUpperCase() ?? "?";
+    const initials = session?.username ? session.username.slice(0, 2).toUpperCase() : "?";
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
     const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
     const [unread, setUnread] = useState(0);
@@ -30,6 +32,24 @@ export default function BranchHeader() {
     const [pages, setPages] = useState(0);
     const [loading, setLoading] = useState(false);
     const [detail, setDetail] = useState<BranchNotification | null>(null);
+    const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem("branch_sidebar_open") !== "false");
+    
+    useEffect(() => {
+        const handleSync = (e: Event) => {
+            const custom = e as CustomEvent<{ open: boolean }>;
+            if (custom.detail && typeof custom.detail.open === "boolean") {
+                setSidebarOpen(custom.detail.open);
+            } else {
+                setSidebarOpen(localStorage.getItem("branch_sidebar_open") !== "false");
+            }
+        };
+        window.addEventListener("branch-sidebar-toggled", handleSync);
+        return () => window.removeEventListener("branch-sidebar-toggled", handleSync);
+    }, []);
+
+    const handleToggleSidebar = () => {
+        window.dispatchEvent(new CustomEvent("toggle-branch-sidebar"));
+    };
 
     const refreshUnreadCount = () => {
         getUnreadCount()
@@ -93,10 +113,23 @@ export default function BranchHeader() {
         <>
             <AppBar position="fixed" elevation={0} className="app-header">
                 <Toolbar className="app-header-toolbar">
-                    <Box sx={{ display: "flex", alignItems: "center" }}>
-                        <img src="/dreamsol-logo.jpg" alt="Dreamsol Logo" style={{ height: 50, width: "auto", maxWidth: 240, objectFit: "contain", display: "block" }} />
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                        <Tooltip title={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}>
+                            <IconButton
+                                size="small"
+                                onClick={handleToggleSidebar}
+                                aria-label={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
+                                sx={{ color: "#17324d", bgcolor: "rgba(23, 50, 77, 0.05)", border: "1px solid #cbd5e1", borderRadius: 2, p: 0.75, transition: "all 0.2s ease", "&:hover": { bgcolor: "rgba(23, 50, 77, 0.12)", transform: "scale(1.05)" } }}
+                            >
+                                {sidebarOpen ? <MenuOpenIcon fontSize="small" /> : <MenuIcon fontSize="small" />}
+                            </IconButton>
+                        </Tooltip>
+                        <img src="/dreamsol-logo.jpg" alt="Dreamsol Logo" style={{ height: 46, width: "auto", maxWidth: 220, objectFit: "contain", display: "block" }} />
                     </Box>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                        <Chip size="small" label={isAdmin ? "ADMIN" : "USER"}
+                            sx={{ fontWeight: 800, fontSize: "0.72rem", height: 26, bgcolor: isAdmin ? "#17324d" : "rgba(100, 116, 139, 0.1)", color: isAdmin ? "#ffffff" : "#475569", borderRadius: 1.5, letterSpacing: 0.5, display: { xs: "none", sm: "inline-flex" } }}
+                        />
                         <Tooltip title="Notifications">
                             <IconButton size="small" className="header-icon-btn" onClick={event => toggleBell(event.currentTarget)}>
                                 <Badge badgeContent={unread} color="error" max={99}> <NotificationsNoneIcon fontSize="small" /> </Badge>
@@ -105,7 +138,7 @@ export default function BranchHeader() {
                         <Tooltip title="Profile & Account">
                             <IconButton size="small" className="header-icon-btn" onClick={event => setProfileAnchor(event.currentTarget)}>
                                 <Avatar sx={{ width: 34, height: 34, bgcolor: "#17324d", fontSize: "0.85rem", fontWeight: 700 }}>
-                                    {session?.username.slice(0, 2).toUpperCase() ?? "?"}{initials}
+                                    {initials}
                                 </Avatar>
                             </IconButton>
                         </Tooltip>

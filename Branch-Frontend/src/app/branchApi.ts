@@ -25,9 +25,9 @@ export interface BranchAnalytics extends Counts {
     branchesByRegion: { name: string; active: number; inactive: number }[];
     branchesByType: { name: string; count: number }[];
     branchesByOrganization: { name: string; count: number }[];
-    creationTrends: { month: string; count: number }[];
+    creationTrends: { date: string; count: number }[];
 }
-export interface UserOption {
+export interface UserOption {by
     id: number;
     username: string;
 }
@@ -60,7 +60,7 @@ export const getBranchHistory = (id: number) => axios.get(`branch/history/${id}`
 
 export const deleteBranch = (id: number) => axios.delete(`branch/delete/${id}`);
 
-export const getBranchTemplate = () => axios.get("branch/template", { responseType: "blob" });
+export const getBranchTemplate = () => axios.post( "common/excel/template", { templateType: "BRANCH" }, { responseType: "blob" } );
 
 const BRANCH_REQUIRED_HEADERS = ["Branch Code", "Branch Name", "Organization", "Branch Type", "Region", "Country", "State", "City", "Address Line 1", "Status"];
 export const validateExcelFile = (file: File) => {

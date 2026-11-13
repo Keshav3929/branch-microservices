@@ -55,9 +55,6 @@ public class BranchController {
     @GetMapping("branch/history/{branchId}")
     public List<BranchHistoryDto> getHistory(@PathVariable Long branchId) { return branchService.getHistory(branchId); }
 
-    @GetMapping("branch/template")
-    public ResponseEntity<byte[]> downloadTemplate() { return branchExcelService.downloadTemplate(); }
-
     @GetMapping("branch/analytics")
     public BranchAnalyticsDto getAnalytics() { return branchService.getAnalytics(); }
 
