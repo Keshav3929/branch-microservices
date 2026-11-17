@@ -22,19 +22,20 @@ export default function DashboardStatTiles({
     const rate = total > 0 ? ((active / total) * 100).toFixed(1) : "0.0";
 
     const tiles = [
-        { id: "total" as const, label: "Total Branches", count: total, subtext: "All registered branches", color: "#17324d", lightBg: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)", icon: <StorageIcon sx={{ fontSize: 26, color: "#93c5fd" }} />, isSelected: activeStatusFilter === undefined },
-        { id: "active" as const, label: "Active", count: active, subtext: `${rate}% operational`, color: "#166534", lightBg: "linear-gradient(135deg, #15803d 0%, #14532d 100%)", icon: <CheckCircleIcon sx={{ fontSize: 26, color: "#86efac" }} />,  isSelected: activeStatusFilter === true },
-        { id: "inactive" as const, label: "Inactive", count: inactive, subtext: total > 0 ? `${((inactive / total) * 100).toFixed(1)}% deactivated` : "0%", color: "#991b1b", lightBg: "linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)", icon: <CancelIcon sx={{ fontSize: 26, color: "#fca5a5" }} />, isSelected: activeStatusFilter === false },
-        { id: "total" as const, label: "Overall Active Rate", count: `${rate}%`, subtext: `${active} of ${total} active`, color: "#0369a1", lightBg: "linear-gradient(135deg, #0284c7 0%, #075985 100%)", icon: <TrendingUpIcon sx={{ fontSize: 26, color: "#7dd3fc" }} />, isSelected: false }
+        { id: "total" as const, label: "Total Branches", count: total, subtext: "All registered branches", color: "#17324d", lightBg: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)", icon: <StorageIcon sx={{ fontSize: 26, color: "#93c5fd" }} />, isSelected: activeStatusFilter === undefined, clickable: true },
+        { id: "active" as const, label: "Active", count: active, subtext: `${rate}% operational`, color: "#166534", lightBg: "linear-gradient(135deg, #15803d 0%, #14532d 100%)", icon: <CheckCircleIcon sx={{ fontSize: 26, color: "#86efac" }} />,  isSelected: activeStatusFilter === true, clickable: true },
+        { id: "inactive" as const, label: "Inactive", count: inactive, subtext: total > 0 ? `${((inactive / total) * 100).toFixed(1)}% deactivated` : "0%", color: "#991b1b", lightBg: "linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)", icon: <CancelIcon sx={{ fontSize: 26, color: "#fca5a5" }} />, isSelected: activeStatusFilter === false, clickable: true },
+        { id: "rate" as const, label: "Overall Active Rate", count: `${rate}%`, subtext: `${active} of ${total} active`, color: "#0369a1", lightBg: "linear-gradient(135deg, #0284c7 0%, #075985 100%)", icon: <TrendingUpIcon sx={{ fontSize: 26, color: "#7dd3fc" }} />, isSelected: false, clickable: false }
     ];
 
     return (
         <Box
-            sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(4, minmax(0, 1fr))" }, gap: 2, mb: 2.5 }}>            {tiles.map((tile, i) => (
-                <Tooltip key={`${tile.label}-${i}`} title={`Click to filter by ${tile.label}`}>
+            sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(4, minmax(0, 1fr))" }, gap: 2, mb: 2.5 }}>            
+            {tiles.map((tile) => (
+                <Tooltip key={tile.id} title={tile.clickable ? `Click to filter by ${tile.label}` : "Display only"}>
                     <Card
-                        elevation={0} onClick={() => onTileClick(tile.id)}
-                        sx={{ p: 2.5, borderRadius: 3, background: tile.lightBg, color: "#ffffff", cursor: "pointer", position: "relative", overflow: "hidden", transition: "all 0.25s ease", boxShadow: tile.isSelected ? "0 8px 24px rgba(0,0,0,0.25)" : "0 2px 8px rgba(0,0,0,0.08)", transform: tile.isSelected ? "scale(1.02)" : "scale(1)", outline: tile.isSelected ? "3px solid #60a5fa" : "none", "&:hover": { transform: "translateY(-4px)", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" } }}
+                        elevation={0} onClick={tile.clickable && tile.id !== "rate" ? () => onTileClick(tile.id) : undefined}
+                        sx={{ p: 2.5, borderRadius: 3, background: tile.lightBg, color: "#ffffff", cursor: tile.clickable ? "pointer" : "default", position: "relative", overflow: "hidden", transition: "all 0.25s ease", boxShadow: tile.isSelected ? "0 8px 24px rgba(0,0,0,0.25)" : "0 2px 8px rgba(0,0,0,0.08)", transform: tile.isSelected ? "scale(1.02)" : "scale(1)", outline: tile.isSelected ? "3px solid #60a5fa" : "none", "&:hover": { transform: tile.clickable ? "translateY(-4px)" : "none", boxShadow: tile.clickable ? "0 10px 25px rgba(0,0,0,0.2)" : "0 2px 8px rgba(0,0,0,0.08)" } }}
                     >
                         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                             <Box>

@@ -15,7 +15,7 @@ export type GaugeChartProps = {
     suffix?: string;
     height?: number;
     engine?: ChartEngine;
-    onClick?: () => void;
+    // onClick removed - charts should not have drill-down functionality
 };
 
 export default function GaugeChart({
@@ -23,8 +23,7 @@ export default function GaugeChart({
     max = 100,
     suffix = "% Active",
     height = 320,
-    engine = "amcharts",
-    onClick
+    engine = "amcharts"
 }: GaugeChartProps) {
     const am5Ref = useRef<HTMLDivElement>(null);
     const safeValue = Math.max(0, Math.min(value, max));
@@ -85,7 +84,7 @@ export default function GaugeChart({
     }, [safeValue, roundedValue, suffix]);
 
     return (
-        <Box onClick={onClick} sx={{ width: "100%", height, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", cursor: onClick ? "pointer" : "default" }} >
+        <Box sx={{ width: "100%", height, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", cursor: "default" }} >
             {engine === "amcharts" ? (
                 <div ref={am5Ref} style={{ width: "100%", height }} />
             ) : engine === "recharts" ? (

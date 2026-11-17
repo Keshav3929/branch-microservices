@@ -7,6 +7,7 @@ import branchmaster.dto.BranchImportRowValidationDto;
 import branchmaster.dto.BranchRequestDto;
 import branchmaster.dto.BranchResponseDto;
 import branchmaster.dto.BranchSearchRequestDto;
+import branchmaster.dto.CreationTrendsDto;
 import branchmaster.dto.DropdownOptionsDto;
 import branchmaster.entity.Branch;
 import branchmaster.exception.BranchException;
@@ -24,7 +25,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 
+import java.time.LocalDate;
+import java.time.temporal.WeekFields;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -61,6 +65,64 @@ public class BranchService {
         scope.setStatus(true);
         long active = branchRepository.count(BranchSpecification.search(scope));
         return Map.of("total", total, "active", active, "inactive", total - active);
+    }
+
+    public CreationTrendsDto getCreationTrends(String granularity, BranchSearchRequestDto filters) {
+        filters = filters == null ? new BranchSearchRequestDto() : filters;
+        LocalDate createdDateFrom = filters.getCreatedDateFrom();
+        LocalDate createdDateTo = filters.getCreatedDateTo();
+        if (createdDateFrom != null && createdDateTo != null && createdDateFrom.isAfter(createdDateTo)) {
+            throw new BranchException(BranchException.Type.INVALID_DATE_RANGE);
+        }
+
+        Boolean status = filters.getStatus();
+        Long organizationId = (filters.getOrganizationId() != null && !filters.getOrganizationId().isEmpty()) ? filters.getOrganizationId().getFirst() : null;
+        Long regionId = (filters.getRegionId() != null && !filters.getRegionId().isEmpty()) ? filters.getRegionId().getFirst() : null;
+        Long countryId = (filters.getCountryId() != null && !filters.getCountryId().isEmpty()) ? filters.getCountryId().getFirst() : null;
+        String branchType = (filters.getBranchType() != null && !filters.getBranchType().isEmpty()) ? filters.getBranchType().getFirst() : null;
+        String normalizedGranularity = granularity == null ? "" : granularity.trim().toLowerCase(Locale.ROOT);
+
+        List<Object[]> results = switch (normalizedGranularity) {
+            case "yearly" -> branchRepository.countByCreationYear(status, organizationId, regionId, countryId, branchType, createdDateFrom, createdDateTo);
+            case "monthly" -> branchRepository.countByCreationMonth(status, organizationId, regionId, countryId, branchType, createdDateFrom, createdDateTo);
+            case "weekly" -> branchRepository.countByCreationWeek(status, organizationId, regionId, countryId, branchType, createdDateFrom, createdDateTo);
+            case "daily" -> branchRepository.countByCreationDayFiltered(status, organizationId, regionId, countryId, branchType, createdDateFrom, createdDateTo);
+            default -> throw new BranchException(BranchException.Type.INVALID_GRANULARITY);
+        };
+
+        Map<String, List<BranchResponseDto>> recordsByPeriod = branchRepository
+                .findAll(BranchSpecification.search(filters))
+                .stream()
+                .filter(branch -> branch.getCreatedAt() != null)
+                .collect(Collectors.groupingBy(
+                        branch -> creationPeriod(branch, normalizedGranularity),
+                        Collectors.mapping(this::toResponse, Collectors.toList())
+                ));
+
+        List<CreationTrendsDto.TrendPoint> trends = results.stream()
+                .map(row -> {
+                    String period = row[0].toString();
+                    return new CreationTrendsDto.TrendPoint(
+                            period,
+                            ((Number) row[1]).longValue(),
+                            recordsByPeriod.getOrDefault(period, List.of())
+                    );
+                })
+                .toList();
+        return new CreationTrendsDto(granularity, trends);
+    }
+
+    private String creationPeriod(Branch branch, String granularity) {
+        LocalDate date = branch.getCreatedAt().toLocalDate();
+        return switch (granularity) {
+            case "yearly" -> String.valueOf(date.getYear());
+            case "monthly" -> String.format("%04d-%02d", date.getYear(), date.getMonthValue());
+            case "weekly" -> String.format("%04d-W%02d",
+                    date.get(WeekFields.ISO.weekBasedYear()),
+                    date.get(WeekFields.ISO.weekOfWeekBasedYear()));
+            case "daily" -> date.toString();
+            default -> throw new BranchException(BranchException.Type.INVALID_GRANULARITY);
+        };
     }
 
     private void notifyChange(Branch saved, String operation) {

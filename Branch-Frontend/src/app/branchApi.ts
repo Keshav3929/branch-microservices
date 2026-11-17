@@ -1,5 +1,6 @@
 import axios, { isAxiosError } from "axios";
 import type {AxiosResponse} from "axios";
+import type { Branch } from "../types/BranchSchema";
 
 axios.defaults.baseURL = "http://localhost:8086";
 axios.defaults.paramsSerializer = { indexes: null };
@@ -27,9 +28,21 @@ export interface BranchAnalytics extends Counts {
     branchesByOrganization: { name: string; count: number }[];
     creationTrends: { date: string; count: number }[];
 }
-export interface UserOption {by
+export interface UserOption {
     id: number;
     username: string;
+}
+
+export type CreationGranularity = "yearly" | "monthly" | "weekly" | "daily";
+
+export interface CreationTrendPoint {
+    period: string;
+    count: number;
+    records: Branch[];
+}
+export interface CreationTrendsResponse {
+    granularity: string;
+    trends: CreationTrendPoint[];
 }
 
 type OrganizationOptionsDto = Pick< DropdownOptions, "organizations" | "branchTypes">;
@@ -92,6 +105,17 @@ export const getErrorMessage = (err: unknown, fallback: string) => parseApiError
 
 export const getAnalytics = (signal?: AbortSignal) =>
     axios.get<BranchAnalytics>("branch/analytics", { signal });
+
+export const getCreationTrends = (
+    granularity: CreationGranularity,
+    filters: BranchSearchRequest,
+    signal?: AbortSignal
+) => {
+    const params = Object.fromEntries(
+        Object.entries({ granularity, ...filters }).filter(([, value]) => value !== undefined && value !== "")
+    );
+    return axios.get<CreationTrendsResponse>("branch/creation-trends", { params, signal });
+};
 
 //---------------------------------------------------//
 export interface Session { token: string; username: string; role: "ADMIN" | "USER" }

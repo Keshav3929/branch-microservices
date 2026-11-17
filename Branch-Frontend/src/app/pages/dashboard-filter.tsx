@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { KeyboardEvent } from "react";
 import {
     Box, Button, Paper, Typography, Stack, Collapse, Chip
 } from "@mui/material";
@@ -9,37 +8,13 @@ import ResetIcon from "@mui/icons-material/RestartAlt";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import dayjs, { type Dayjs } from "dayjs";
-import customParseFormat from "dayjs/plugin/customParseFormat";
 import MultiSelectAutoComplete from "../../components/MultiSelectAutoComplete";
 import type { BranchFilters } from "./branch-filter";
 import type { DropdownOptions } from "../branchApi";
+import { DATE_FMT, today, parseDate, formatDate, pickerErrors, popperSx, DateKey, toIds, getQuickRangeDates, dateKeyDown, DASHBOARD_QUICK_RANGES } from "../filterUtils";
+import { Dayjs } from "dayjs";
 
-dayjs.extend(customParseFormat);
-export const DATE_FMT = "DD-MM-YYYY";
-const today = () => dayjs().startOf("day");
-const parseDate = (v: string): Dayjs | null => {
-    const d = dayjs(v, DATE_FMT, true);
-    return v && d.isValid() ? d.startOf("day") : null;
-};
-const formatDate = (d: Dayjs) => d.format(DATE_FMT);
-
-interface Option { id: number | string; name: string; }
-const toIds = (val: unknown): (string | number)[] =>
-    (Array.isArray(val) ? val : [val]).filter(v => v != null && v !== "").map(v => typeof v === "object" ? (v as Option).id : v as string | number);
 const gridStyle = { display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(4, minmax(0, 1fr))" }, gap: 2};
-const popperSx = {
-    "& .MuiDateCalendar-root": { height: "auto", paddingBottom: 0 },
-    "& .MuiPickersLayout-contentWrapper": { paddingBottom: 0 },
-    "& .MuiPickersLayout-actionBar": { paddingTop: 0, paddingBottom: "2px", minHeight: "auto", marginTop: "-18px" }
-};
-const pickerErrors: Record<string, string> = {
-    invalidDate: "Enter a valid date in DD-MM-YYYY format",
-    maxDate: "Future dates are not allowed",
-    minDate: "To date cannot be before From date"
-};
-
-type DateKey = "createdDateFrom" | "createdDateTo";
 
 export type DashboardFilterBarProps = {
     filters: BranchFilters;
@@ -80,21 +55,8 @@ export default function DashboardFilterBar({
         set({ [field]: date ? formatDate(date.startOf("day")) : "" });
         setError(field, "");
     };
-    const dateKeyDown = (event: KeyboardEvent) => {
-        if (event.ctrlKey || event.metaKey || event.altKey ||
-            ["Backspace", "Delete", "Tab", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "Enter"].includes(event.key)) return;
-        if (!/^[0-9/-]$/.test(event.key)) event.preventDefault();
-    };
     const setQuickRange = (range: "today" | "7days" | "30days" | "thisMonth" | "thisYear" | "all") => {
-        const now = dayjs();
-        let from = "";
-        let to = formatDate(now);
-        if (range === "today") from = formatDate(now);
-        else if (range === "7days") from = formatDate(now.subtract(7, "day"));
-        else if (range === "30days") from = formatDate(now.subtract(30, "day"));
-        else if (range === "thisMonth") from = formatDate(now.startOf("month"));
-        else if (range === "thisYear") from = formatDate(now.startOf("year"));
-        else if (range === "all") { from = ""; to = ""; }
+        const { from, to } = getQuickRangeDates(range);
         const next = { ...filters, createdDateFrom: from, createdDateTo: to };
         setFilters(next);
         onApply(next);
@@ -125,16 +87,7 @@ export default function DashboardFilterBar({
                     </LocalizationProvider>
                     <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
                         <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", mr: 0.5 }}> Quick Range: </Typography>
-                        {(
-                            [
-                                ["today", "Today"],
-                                ["7days", "7 Days"],
-                                ["30days", "30 Days"],
-                                ["thisMonth", "This Month"],
-                                ["thisYear", "This Year"],
-                                ["all", "All Time"]
-                            ] as const
-                        ).map(([rangeKey, label]) => (
+                        {DASHBOARD_QUICK_RANGES.map(([rangeKey, label]) => (
                             <Chip key={rangeKey} label={label} size="small" clickable onClick={() => setQuickRange(rangeKey)} sx={{ fontSize: "0.75rem", fontWeight: 600, bgcolor: "#f1f5f9", color: "#334155", "&:hover": { bgcolor: "#e2e8f0" } }} />
                         ))}
                     </Stack>

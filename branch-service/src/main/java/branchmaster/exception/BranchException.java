@@ -14,7 +14,9 @@ public class BranchException extends RuntimeException {
         CODE_EXISTS("Branch code already exists", HttpStatus.CONFLICT, "branchCode"),
         NAME_EXISTS("Branch name already exists for this organization", HttpStatus.CONFLICT, "branchName"),
         NOT_FOUND("Branch not found", HttpStatus.NOT_FOUND, null),
-        INVALID_ROW("Invalid branch data", HttpStatus.BAD_REQUEST, null);
+        INVALID_ROW("Invalid branch data", HttpStatus.BAD_REQUEST, null),
+        INVALID_DATE_RANGE("Created date from must not be after created date to", HttpStatus.BAD_REQUEST, "createdDateTo"),
+        INVALID_GRANULARITY("Unsupported creation-trends granularity", HttpStatus.BAD_REQUEST, "granularity");
 
         private final String message;
         private final HttpStatus status;

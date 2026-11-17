@@ -17,13 +17,13 @@ export type PieChartProps = {
     valueField: string;
     height?: number;
     engine?: ChartEngine;
-    onSliceClick?: (category: string, value: number) => void;
+    // onSliceClick removed - charts should not have drill-down functionality
 };
 
 const PALETTE = [ "#2563eb", "#06b6d4", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#6366f1", "#84cc16"];
 
 export default function PieChart({
-    data, categoryField, valueField, height = 320, engine = "amcharts", onSliceClick
+    data, categoryField, valueField, height = 320, engine = "amcharts"
 }: PieChartProps) {
     const am5Ref = useRef<HTMLDivElement>(null);
     const rows = useMemo(() => {
@@ -46,35 +46,20 @@ export default function PieChart({
         const series = chart.series.push( am5percent.PieSeries.new(root, { categoryField: "category", valueField: "value" }) );
         series.data.setAll(rows);
         series.labels.template.setAll({ text: "{category}: {value}", fontSize: 12 });
-        series.slices.template.setAll({ tooltipText: "{category}: {value}", cursorOverStyle: onSliceClick ? "pointer" : "default" });
-
-        if (onSliceClick) {
-            series.slices.template.events.on("click", ev => {
-                const dataContext = ev.target.dataItem?.dataContext as { category?: string; value?: number } | undefined;
-                if (dataContext?.category) {
-                    onSliceClick(dataContext.category, dataContext.value ?? 0);
-                }
-            });
-        }
+        series.slices.template.setAll({ tooltipText: "{category}: {value}", cursorOverStyle: "default" });
         series.appear(800);
         return () => root.dispose();
-    }, [rows, engine, onSliceClick]);
+    }, [rows, engine]);
     // ----------------- ApexCharts Options -----------------
     const apexSeries = useMemo(() => rows.map(r => r.value), [rows]);
     const apexOptions = useMemo<ApexCharts.ApexOptions>(() => {
         return {
-            chart: { type: "donut", animations: { enabled: true, speed: 600 }, events: { dataPointSelection: (_, __, config) => { if (!config) return;
-                        const index = config.dataPointIndex;
-                        const row = rows[index];
-                        if (row && onSliceClick) { onSliceClick(row.category, row.value); }
-                    }
-                }
-            },
+            chart: { type: "donut", animations: { enabled: true, speed: 600 } },
             labels: rows.map(r => r.category), colors: PALETTE, legend: { position: "bottom", fontSize: "12px", markers: { size: 6 } },
             plotOptions: { pie: { donut: { size: "55%", labels: { show: true, total: { show: true, label: "Total", fontSize: "14px", fontWeight: 700, color: "#64748b", formatter: () => String(rows.reduce((sum, r) => sum + r.value, 0)) } } } } },
             tooltip: { y: { formatter: val => `${val} branches` }}, dataLabels: { enabled: true, formatter: val => `${Math.round(Number(val))}%` }
         };
-    }, [rows, onSliceClick]);
+    }, [rows]);
     if (!rows.length) {
         return ( <Typography color="text.secondary" textAlign="center" py={5}> No chart data available. </Typography> );
     }
@@ -87,13 +72,7 @@ export default function PieChart({
                 <ResponsiveContainer width="100%" height={height}>
                     <RechartsPieChart>
                         <Pie data={rows} dataKey="value" nameKey="category" cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={2}
-                            label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine cursor={onSliceClick ? "pointer" : "default"}
-                            onClick={(entry: unknown) => {
-                                const sector = entry as { category?: string; value?: number } | undefined;
-                                if (sector?.category && onSliceClick) {
-                                    onSliceClick(sector.category, Number(sector.value ?? 0));
-                                }
-                            }}
+                            label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine cursor="default"
                         >
                             {rows.map((_, index) => ( <Cell key={`cell-${index}`} fill={PALETTE[index % PALETTE.length]} /> ))}
                         </Pie>

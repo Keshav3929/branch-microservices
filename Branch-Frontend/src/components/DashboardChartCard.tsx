@@ -68,7 +68,6 @@ export default function DashboardChartCard({
         const start = page * rowsPerPage;
         return sortedData.slice(start, start + rowsPerPage);
     }, [sortedData, page, rowsPerPage]);
-    // Totals row calculation
     const totals = useMemo(() => {
         const acc: Record<string, number> = {};
         tableColumns.forEach(col => {

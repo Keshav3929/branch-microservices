@@ -5,6 +5,7 @@ import branchmaster.dto.BranchHistoryDto;
 import branchmaster.dto.BranchRequestDto;
 import branchmaster.dto.BranchResponseDto;
 import branchmaster.dto.BranchSearchRequestDto;
+import branchmaster.dto.CreationTrendsDto;
 import branchmaster.dto.NotificationDto;
 import branchmaster.service.BranchExcelService;
 import branchmaster.service.BranchService;
@@ -57,6 +58,13 @@ public class BranchController {
 
     @GetMapping("branch/analytics")
     public BranchAnalyticsDto getAnalytics() { return branchService.getAnalytics(); }
+
+    @GetMapping("branch/creation-trends")
+    public CreationTrendsDto getCreationTrends(
+            @RequestParam String granularity,
+            BranchSearchRequestDto filters) {
+        return branchService.getCreationTrends(granularity, filters);
+    }
 
     @GetMapping("notifications")
     public Page<NotificationDto> listNotifications(

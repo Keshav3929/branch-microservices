@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, Dispatch, SetStateAction } from "react";
 import dayjs from "dayjs";
 import {
@@ -20,8 +20,9 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DomainIcon from "@mui/icons-material/Domain";
 import type { MRT_Row, MRT_ColumnDef, MRT_PaginationState, MRT_SortingState } from "material-react-table";
-import SearchForm, { DATE_FMT } from "./branch-filter";
+import SearchForm from "./branch-filter";
 import type { BranchFilters, FilterChip } from "./branch-filter";
+import { DATE_FMT } from "../filterUtils";
 import BranchHistoryDialog from "./branch-history";
 import DataTable from "../../components/Table";
 import AddForm from "./add-form";
@@ -30,8 +31,9 @@ import { showSuccess, showError } from "../../components/SweetAlert";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "../../redux/store";
 import { fetchBranches, setBranchLocally, removeBranchLocally } from "../../redux/branchSlice";
-import { deleteBranch, getSession, getCounts, saveBranches, validateExcelFile, getBranchTemplate, getDropdownOptions, getErrorMessage, getUsers, getUserName } from "../branchApi";
-import type { Counts, DropdownOptions, UserOption } from "../branchApi";
+import { deleteBranch, getSession, getCounts, saveBranches, validateExcelFile, getBranchTemplate, getErrorMessage, getUserName } from "../branchApi";
+import type { Counts, DropdownOptions } from "../branchApi";
+import { fetchDropdownOptions, fetchUsers, selectFreshDropdownOptions, selectFreshUsers, invalidateAll } from "../../redux/cacheSlice";
 import { parseIdList, viewCols } from "../branchUtils";
 import type { Branch } from "../../types/BranchSchema";
 import BranchHeader from "../../components/Header";
@@ -104,10 +106,11 @@ export default function BranchManagement() {
     const isAdmin = getSession()?.role === "ADMIN";
     const { branches, totalElements, loading, error } = useSelector((state: RootState) => state.branch);
     const excelInputRef = useRef<HTMLInputElement>(null);
-    const dropdownRequest = useRef<Promise<DropdownOptions> | undefined>(undefined);
-    const [optionsData, setOptionsData] = useState<DropdownOptions>(emptyOptions);
-    const [users, setUsers] = useState<UserOption[]>([]);
-    const optionsReady = optionsData !== emptyOptions;
+    // Use shared Redux cache for dropdown options and users
+    const dropdownOptions = useSelector(selectFreshDropdownOptions);
+    const users = useSelector(selectFreshUsers) ?? [];
+    const optionsReady = dropdownOptions !== null;
+    const optionsData = dropdownOptions ?? emptyOptions;
     const optionFields = useMemo(() => getOptionFields(optionsData), [optionsData]);
     const [counts, setCounts] = useState<Counts>({ total: 0, active: 0, inactive: 0 });
     const [countsVersion, setCountsVersion] = useState(0);
@@ -142,13 +145,11 @@ export default function BranchManagement() {
     const resetPage = () => setPagination(p => p.pageIndex ? { ...p, pageIndex: 0 } : p);
     const statusFilter = applied.status.length === 1 ? applied.status[0] === "Active" : undefined;
     const selectedTile: Tile = statusFilter === undefined ? "total" : statusFilter ? "active" : "inactive";
-    const ensureDropdownOptions = useCallback((): Promise<DropdownOptions> => {
-        dropdownRequest.current ??= getDropdownOptions()
-            .then(({ data }) => { setOptionsData(data); return data; })
-            .catch((e: unknown) => { dropdownRequest.current = undefined; throw e; });
-        return dropdownRequest.current;
-    }, []);
-    useEffect(() => { ensureDropdownOptions().catch(() => showError("Error!", "Failed to load dropdown options.")); }, [ensureDropdownOptions]);
+    // Fetch dropdown options and users from shared cache on mount
+    useEffect(() => {
+        dispatch(fetchDropdownOptions());
+        dispatch(fetchUsers());
+    }, [dispatch]);
 
     const datesApplied = modes[scope].datesApplied;
     const dateRange = useMemo(() => {
@@ -166,11 +167,6 @@ export default function BranchManagement() {
         return () => request.abort();
     }, [dispatch, query]);
     useEffect(() => {
-        getUsers()
-            .then(({ data }) => setUsers(data))
-            .catch(() => showError("Error!", "Failed to load users."));
-    }, []);
-    useEffect(() => {
         const controller = new AbortController();
         getCounts(dateRange, controller.signal).then(({ data }) => setCounts(data)).catch(() => { });
         return () => controller.abort();
@@ -178,6 +174,8 @@ export default function BranchManagement() {
     const afterChange = () => {
         setCountsVersion(version => version + 1);
         window.dispatchEvent(new Event("notifications-updated"));
+        // Invalidate shared cache when branch data changes
+        dispatch(invalidateAll());
     };
     const handleSaveSuccess = (saved: Branch[]) => { saved.filter(b => statusFilter === undefined || b.status === statusFilter).forEach(b => dispatch(setBranchLocally(b))); afterChange(); };
     const handleUpdateSuccess = (branch: Branch) => { dispatch(statusFilter !== undefined && branch.status !== statusFilter ? removeBranchLocally(branch.id) : setBranchLocally(branch)); afterChange(); };
@@ -200,21 +198,11 @@ export default function BranchManagement() {
         resetPage();
     };
     const closeView = () => setViewBranch(null);
-    const handleView = async (branch: Branch) => {
-        try {
-            await ensureDropdownOptions();
-            setViewBranch(branch);
-        } catch {
-            await showError("Error!", "Failed to load dropdown options for branch history.");
-        }
+    const handleView = (branch: Branch) => {
+        setViewBranch(branch);
     };
-    const handleEdit = async (branch: Branch) => {
-        try {
-            await ensureDropdownOptions();
-            setEditBranch(branch);
-        } catch {
-            await showError("Error!", "Failed to load dropdown options.");
-        }
+    const handleEdit = (branch: Branch) => {
+        setEditBranch(branch);
     };
     const handleDelete = async (id: number) => {
         setDeleteId(null);
@@ -294,13 +282,7 @@ export default function BranchManagement() {
             await showError("Invalid Excel file", getErrorMessage(err, "The selected Excel file failed validation."));
             return;
         }
-        let fields: OptionFields;
-        try {
-            fields = getOptionFields(await ensureDropdownOptions());
-        } catch {
-            await showError("Error!", "Failed to load dropdown options for Excel validation.");
-            return;
-        }
+        const fields = getOptionFields(optionsData);
 
         let parsed: { data: ExcelRow; errors: string[] }[];
         try {
@@ -503,7 +485,8 @@ export default function BranchManagement() {
                 {isAdmin && <SpeedDialAction icon={<AddIcon />} tooltipTitle="Add New Branch" slotProps={{ fab: { sx: { bgcolor: "#2529fc", color: "#fff", "&:hover": { bgcolor: "#3930b8" } } } }}
                     onClick={() => {
                         setDialOpen(false);
-                        void ensureDropdownOptions().then(() => setAddOpen(true)).catch(() => showError("Error!", "Failed to load dropdown options."));
+                        // Dropdown options are now available from shared Redux cache
+                        setAddOpen(true);
                     }} />}
                 <SpeedDialAction icon={<DownloadIcon />} tooltipTitle="Download Excel" slotProps={{ fab: { sx: { bgcolor: "#434e67", color: "#fff", "&:hover": { bgcolor: "#7f8cac" } } } }}
                     onClick={e => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setDialOpen(false); setExcelMenu({ top: r.top, left: r.left }); }}
