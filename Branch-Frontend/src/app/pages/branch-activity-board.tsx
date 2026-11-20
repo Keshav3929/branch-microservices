@@ -33,7 +33,7 @@ import type { RootState, AppDispatch } from "../../redux/store";
 import { fetchBranches, setBranchLocally, removeBranchLocally } from "../../redux/branchSlice";
 import { deleteBranch, getSession, getCounts, saveBranches, validateExcelFile, getBranchTemplate, getErrorMessage, getUserName } from "../branchApi";
 import type { Counts, DropdownOptions } from "../branchApi";
-import { fetchDropdownOptions, fetchUsers, selectFreshDropdownOptions, selectFreshUsers, invalidateAll } from "../../redux/cacheSlice";
+import { fetchDropdownOptions, fetchUsers, selectFreshDropdownOptions, selectFreshUsers, invalidateAnalytics } from "../../redux/cacheSlice";
 import { parseIdList, viewCols } from "../branchUtils";
 import type { Branch } from "../../types/BranchSchema";
 import BranchHeader from "../../components/Header";
@@ -114,6 +114,7 @@ export default function BranchManagement() {
     const optionFields = useMemo(() => getOptionFields(optionsData), [optionsData]);
     const [counts, setCounts] = useState<Counts>({ total: 0, active: 0, inactive: 0 });
     const [countsVersion, setCountsVersion] = useState(0);
+    const [branchesVersion, setBranchesVersion] = useState(0);
     const [scope, setScope] = useState<Scope>("all");
     const [modes, setModes] = useState<Record<Scope, ModeState>>(() => {
         const all = defaults();
@@ -159,8 +160,9 @@ export default function BranchManagement() {
     }, [scope, datesApplied, applied.createdDateFrom, applied.createdDateTo]);
     const query = useMemo(() => ({
         filters: { search: applied.search.trim() || undefined, organizationId: applied.organizationId, regionId: applied.regionId, countryId: applied.countryId, branchType: applied.branchType, status: statusFilter, ...dateRange },
-        page: { page: pagination.pageIndex, size: pagination.pageSize, sort: sorting[0] ? `${sorting[0].id},${sorting[0].desc ? "desc" : "asc"}` : undefined }
-    }), [applied, statusFilter, dateRange, pagination, sorting]);
+        page: { page: pagination.pageIndex, size: pagination.pageSize, sort: sorting[0] ? `${sorting[0].id},${sorting[0].desc ? "desc" : "asc"}` : undefined },
+        _v: branchesVersion
+    }), [applied, statusFilter, dateRange, pagination, sorting, branchesVersion]);
     useEffect(() => {
         const request = dispatch(fetchBranches(query));
         request.unwrap().catch(e => { if (e?.name !== "AbortError") void showError("Error!", "Failed to load branches."); });
@@ -173,9 +175,10 @@ export default function BranchManagement() {
     }, [scope, dateRange, countsVersion]);
     const afterChange = () => {
         setCountsVersion(version => version + 1);
+        setBranchesVersion(version => version + 1);
+        // Invalidate only analytics (counts change after mutations); keep dropdown/users cache valid
+        dispatch(invalidateAnalytics());
         window.dispatchEvent(new Event("notifications-updated"));
-        // Invalidate shared cache when branch data changes
-        dispatch(invalidateAll());
     };
     const handleSaveSuccess = (saved: Branch[]) => { saved.filter(b => statusFilter === undefined || b.status === statusFilter).forEach(b => dispatch(setBranchLocally(b))); afterChange(); };
     const handleUpdateSuccess = (branch: Branch) => { dispatch(statusFilter !== undefined && branch.status !== statusFilter ? removeBranchLocally(branch.id) : setBranchLocally(branch)); afterChange(); };

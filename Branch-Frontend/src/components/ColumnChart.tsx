@@ -1,7 +1,6 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import {
-    Box, Button, Typography, ToggleButton, ToggleButtonGroup,
-    FormControl, InputLabel, Select, MenuItem, useTheme
+    Box, Typography, useTheme
 } from "@mui/material";
 import * as am5 from "@amcharts/amcharts5";
 import * as am5xy from "@amcharts/amcharts5/xy";
@@ -22,13 +21,10 @@ export type ColumnChartProps = {
     categoryField: string;
     valueFields: ChartValueField[];
     stacked?: boolean;
-    drillDown?: boolean;
     height?: number;
     engine?: ChartEngine;
     // onBarClick removed - charts should not have drill-down functionality
 };
-
-type TrendLevel = "year" | "month" | "week" | "day";
 
 const toHexColor = (c: string | number | undefined, defaultColor = "#1976d2"): string => {
     if (!c) return defaultColor;
@@ -42,65 +38,18 @@ export default function ColumnChart({
     categoryField,
     valueFields,
     stacked = false,
-    drillDown = false,
     height = 320,
     engine = "amcharts"
 }: ColumnChartProps) {
     const theme = useTheme();
     const am5Ref = useRef<HTMLDivElement>(null);
-    const [level, setLevel] = useState<TrendLevel>("year");
-    const [year, setYear] = useState(new Date().getFullYear());
-    const [month, setMonth] = useState(new Date().getMonth() + 1);
-    const [week, setWeek] = useState(1);
 
-    const availableYears = useMemo(() => {
-        const years = new Set<number>();
-        (data as ChartRow[]).forEach(item => {
-            const date = String(item[categoryField] ?? "");
-            if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-                years.add(Number(date.slice(0, 4)));
-            }
-        });
-        return Array.from(years).sort((a, b) => b - a);
+    const rows = useMemo<ChartRow[]>(() => {
+        const source = data as ChartRow[];
+        return source.map(item => ({ ...item, category: String(item[categoryField] ?? "") }));
     }, [data, categoryField]);
 
-    const selectedYear = availableYears.includes(year) ? year : availableYears[0] ?? year;
-    const rows = useMemo<ChartRow[]>(() => { const source = data as ChartRow[];
-        if (!drillDown) {
-            return source.map(item => ({ ...item, category: String(item[categoryField] ?? "") }));
-        }
-        const grouped = new Map<string, number>();
-        const prefix = `${selectedYear}-${String(month).padStart(2, "0")}`;
-        const countField = valueFields[0]?.field ?? "count";
-        source.forEach(item => {
-            const date = String(item[categoryField] ?? "");
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
-            let key: string;
-
-            if (level === "year") {
-                key = date.slice(0, 4);
-            } else if (level === "month") {
-                if (!date.startsWith(`${selectedYear}-`)) return;
-                key = date.slice(0, 7);
-            } else if (level === "week") {
-                if (!date.startsWith(`${selectedYear}-`)) return;
-                const dayNum = Number(date.slice(8, 10));
-                const weekOfMonth = Math.ceil(dayNum / 7);
-                if (weekOfMonth !== week) return;
-                key = `Week ${weekOfMonth}`;
-            } else {
-                if (!date.startsWith(`${prefix}-`)) return;
-                key = date.slice(8, 10);
-            }
-            const count = Number(item[countField] ?? 0);
-            grouped.set(key, (grouped.get(key) ?? 0) + count);
-        });
-        return Array.from(grouped, ([category, count]) => ({
-            category, [countField]: count
-        })).sort((a, b) => a.category.localeCompare(b.category));
-    }, [data, categoryField, valueFields, drillDown, level, selectedYear, month, week]);
-
-    const chartTitle = !drillDown ? title : level === "year" ? title : level === "month" ? `Branch Creations in ${selectedYear}` : level === "week" ? `Weekly Creations in ${selectedYear}-${String(month).padStart(2, "0")}` : `Daily Creations — ${selectedYear}-${String(month).padStart(2, "0")}`;
+    const chartTitle = title;
     // ----------------- AmCharts 5 Build -----------------
     const buildAmCharts = useCallback(() => {
         if (!am5Ref.current || !rows.length || engine !== "amcharts") return;
@@ -141,15 +90,6 @@ export default function ColumnChart({
         return () => root?.dispose();
     }, [buildAmCharts, engine]);
 
-    const goBack = () => {
-        if (level === "day") {
-            setLevel("week");
-        } else if (level === "week") {
-            setLevel("month");
-        } else if (level === "month") {
-            setLevel("year");
-        }
-    };
     // ----------------- ApexCharts Options -----------------
     const apexSeries = useMemo(() => {
         return valueFields.map(vf => ({
@@ -173,58 +113,7 @@ export default function ColumnChart({
 
     return (
         <Box sx={{ width: "100%" }}>
-            {drillDown && (
-                <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1, mb: 1.5 }}>
-                    <Typography variant="subtitle2" fontWeight={700} sx={{ flex: 1, color: "text.secondary" }}> {chartTitle} </Typography>
-                    <ToggleButtonGroup size="small" exclusive value={level} onChange={(_, nextLevel: TrendLevel | null) => { if (nextLevel) setLevel(nextLevel); }} >
-                        <ToggleButton value="year" sx={{ px: 1.5, py: 0.25, fontSize: "0.75rem" }}>Yearly</ToggleButton>
-                        <ToggleButton value="month" sx={{ px: 1.5, py: 0.25, fontSize: "0.75rem" }}>Monthly</ToggleButton>
-                        <ToggleButton value="week" sx={{ px: 1.5, py: 0.25, fontSize: "0.75rem" }}>Weekly</ToggleButton>
-                        <ToggleButton value="day" sx={{ px: 1.5, py: 0.25, fontSize: "0.75rem" }}>Daily</ToggleButton>
-                    </ToggleButtonGroup>
-                    {level !== "year" && (
-                        <FormControl size="small" sx={{ minWidth: 90 }}>
-                            <InputLabel sx={{ fontSize: "0.8rem" }}>Year</InputLabel>
-                            <Select value={selectedYear} label="Year" sx={{ fontSize: "0.8rem" }} onChange={event => setYear(Number(event.target.value))} >
-                                {availableYears.map(item => ( <MenuItem key={item} value={item} sx={{ fontSize: "0.8rem" }}>{item}</MenuItem> ))}
-                            </Select>
-                        </FormControl>
-                    )}
-                    {level === "month" && (
-                        <FormControl size="small" sx={{ minWidth: 110 }}>
-                            <InputLabel sx={{ fontSize: "0.8rem" }}>Month</InputLabel>
-                            <Select value={month} label="Month" sx={{ fontSize: "0.8rem" }} onChange={event => setMonth(Number(event.target.value))} >
-                                {Array.from({ length: 12 }, (_, index) => index + 1).map(item => (
-                                    <MenuItem key={item} value={item} sx={{ fontSize: "0.8rem" }}> {new Date(2000, item - 1).toLocaleString("en", { month: "short" })} </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                    )}
-                    {level === "week" && (
-                        <FormControl size="small" sx={{ minWidth: 90 }}>
-                            <InputLabel sx={{ fontSize: "0.8rem" }}>Week</InputLabel>
-                            <Select value={week} label="Week" sx={{ fontSize: "0.8rem" }} onChange={event => setWeek(Number(event.target.value))} >
-                                {Array.from({ length: 5 }, (_, index) => index + 1).map(item => (
-                                    <MenuItem key={item} value={item} sx={{ fontSize: "0.8rem" }}>Week {item}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                    )}
-                    {level === "day" && (
-                        <FormControl size="small" sx={{ minWidth: 110 }}>
-                            <InputLabel sx={{ fontSize: "0.8rem" }}>Month</InputLabel>
-                            <Select value={month} label="Month" sx={{ fontSize: "0.8rem" }} onChange={event => setMonth(Number(event.target.value))} >
-                                {Array.from({ length: 12 }, (_, index) => index + 1).map(item => (
-                                    <MenuItem key={item} value={item} sx={{ fontSize: "0.8rem" }}> {new Date(2000, item - 1).toLocaleString("en", { month: "short" })} </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                    )}
-                    {level !== "year" && (
-                        <Button size="small" variant="outlined" onClick={goBack} sx={{ textTransform: "none", py: 0.25, fontSize: "0.75rem" }}> Back </Button>
-                    )}
-                </Box>
-            )}
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5, color: "text.secondary" }}> {chartTitle} </Typography>
             {!rows.length ? (
                 <Typography color="text.secondary" textAlign="center" py={5}> No chart data available. </Typography>
             ) : engine === "amcharts" ? (

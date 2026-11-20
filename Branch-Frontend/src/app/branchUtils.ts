@@ -29,15 +29,6 @@ export const getErrorMessage = (err: unknown, fallback: string): string => {
     return (typeof d === "string" && d.trim()) || d?.message || d?.error || d?.detail || fallback;
 };
 
-export const parseApiError = (err: unknown) => {
-    const d = isAxiosError(err) ? err.response?.data : undefined;
-    return {
-        message: typeof d === "string" ? d : d?.message as string | undefined,
-        fields: (d?.errors ?? {}) as Record<string, string>,
-        invalidRows: d?.invalidRows as { row: number; errors: string[] }[] | undefined
-    };
-};
-
 export const toPayload = <T extends Record<string, unknown>>(f: T) => ({
     ...f,
     ...Object.fromEntries(["workingHoursId", "contactPerson", "latitude", "longitude"]

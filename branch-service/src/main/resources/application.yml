@@ -1,6 +1,9 @@
 spring:
   application:
     name: branch-service
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   data:
     redis:
       host: localhost

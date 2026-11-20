@@ -1,6 +1,9 @@
 spring:
   application:
     name: oauth
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
 
   config:
     import:

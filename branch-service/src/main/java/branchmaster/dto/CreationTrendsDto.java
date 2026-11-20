@@ -10,7 +10,6 @@ public record CreationTrendsDto(
 
     public record TrendPoint(
             String period,
-            long count,
-            List<BranchResponseDto> records
+            long count
     ) implements Serializable {}
 }

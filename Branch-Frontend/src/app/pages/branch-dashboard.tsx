@@ -86,17 +86,6 @@ function computeAnalytics(branches: Branch[], options: DropdownOptions): BranchA
 
 type TrendLevel = "yearly" | "monthly" | "weekly" | "daily";
 
-function getIsoWeekPeriod(dateValue: string): string {
-    const date = new Date(`${dateValue}T00:00:00`);
-    const isoDay = date.getDay() || 7;
-    date.setDate(date.getDate() + 4 - isoDay);
-
-    const year = date.getFullYear();
-    const yearStart = new Date(year, 0, 1);
-    const week = Math.ceil((((date.getTime() - yearStart.getTime()) / 86_400_000) + 1) / 7);
-    return `${year}-W${String(week).padStart(2, "0")}`;
-}
-
 function getTrendDateRange(period: string): { from: string; to: string } | null {
     if (/^\d{4}-\d{2}-\d{2}$/.test(period)) {
         return { from: formatDate(dayjs(period)), to: formatDate(dayjs(period)) };
@@ -139,7 +128,7 @@ export default function BranchDashboard() {
     const [drilldownOpen, setDrilldownOpen] = useState(false);
     const [drilldownLoading, setDrilldownLoading] = useState(false);
     const drilldownRequestId = useRef(0);
-    const isInitialMount = useRef(true);
+    const initialLoadComplete = useRef(false);
     // Creation Trends state
     const [creationTrendsLevel, setCreationTrendsLevel] = useState<TrendLevel>("monthly");
     const [creationTrendsData, setCreationTrendsData] = useState<CreationTrendsResponse | null>(null);
@@ -236,6 +225,7 @@ export default function BranchDashboard() {
                     setAllBranches(list);
                     setTotalFilteredCount(branchRes.data?.totalElements ?? list.length);
                     setAnalytics(computeAnalytics(list, initialOptions));
+                    initialLoadComplete.current = true;
                 }
             } catch (err) {
                 if (!isCancel(err)) setFailed(true);
@@ -248,10 +238,7 @@ export default function BranchDashboard() {
     }, [dispatch, buildSearchRequest]);
     // Filter change effect
     useEffect(() => {
-        if (isInitialMount.current) {
-            isInitialMount.current = false;
-            return;
-        }
+        if (!initialLoadComplete.current) return;
         const searchReq = buildSearchRequest(appliedFilters);
         const hasFilter = Object.values(searchReq).some(v => v !== undefined);
         const controller = new AbortController();
@@ -573,7 +560,6 @@ export default function BranchDashboard() {
                                     data={creationTrendsData.trends.map(t => ({ date: t.period, count: t.count }))}
                                     categoryField="date"
                                     valueFields={[{ field: "count", name: "Branches", color: "#1976d2" }]}
-                                    drillDown={false}
                                     engine={engine}
                                 />
                             )}

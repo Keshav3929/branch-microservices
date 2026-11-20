@@ -47,9 +47,8 @@ class BranchServiceApplicationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.granularity").value("monthly"))
                 .andExpect(jsonPath("$.trends").isArray())
-                .andExpect(jsonPath("$.trends[0].records").isArray())
-                .andExpect(jsonPath("$.trends[0].records[0].id").isNumber())
-                .andExpect(jsonPath("$.trends[0].records[0].branchCode").isString());
+                .andExpect(jsonPath("$.trends[0].period").isString())
+                .andExpect(jsonPath("$.trends[0].count").isNumber());
     }
 
     @Test

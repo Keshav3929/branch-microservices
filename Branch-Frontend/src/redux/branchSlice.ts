@@ -8,10 +8,11 @@ interface BranchState {
     totalElements: number;
     loading: boolean;
     error: string | null;
+    currentRequestId?: string;
 }
 
 const initialState: BranchState = {
-    branches: [], totalElements: 0, loading: false, error: null
+    branches: [], totalElements: 0, loading: false, error: null, currentRequestId: undefined
 };
 
 export const hasFilters = (f: BranchSearchRequest) =>
@@ -50,19 +51,23 @@ const branchSlice = createSlice({
         }
     },
     extraReducers: builder => builder
-        .addCase(fetchBranches.pending, state => {
+        .addCase(fetchBranches.pending, (state, action) => {
             state.loading = true;
             state.error = null;
+            state.currentRequestId = action.meta.requestId;
         })
         .addCase(fetchBranches.fulfilled, (state, action) => {
+            if (action.meta.requestId !== state.currentRequestId) return;
             state.loading = false;
             state.branches = action.payload.content;
             state.totalElements = action.payload.totalElements;
         })
         .addCase(fetchBranches.rejected, (state, action) => {
-            if (action.meta.aborted) return;
+            if (action.meta.requestId !== state.currentRequestId) return;
             state.loading = false;
-            state.error = action.error.message || "Failed to load branches";
+            if (!action.meta.aborted) {
+                state.error = action.error.message || "Failed to load branches";
+            }
         })
 });
 

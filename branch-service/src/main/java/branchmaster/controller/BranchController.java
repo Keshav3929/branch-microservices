@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ public class BranchController {
     private final BranchExcelService branchExcelService;
     private final NotificationService notificationService;
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("branch/save-multiple")
     public ResponseEntity<?> save(
             @RequestBody List<BranchRequestDto> requests, @RequestParam(defaultValue = "false") boolean validateOnly) {
@@ -43,6 +45,7 @@ public class BranchController {
     @GetMapping("branch/list")
     public Page<BranchResponseDto> getAll(Pageable pageable) { return branchService.getAll(pageable); }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("branch/delete/{id}")
     public String deleteById(@PathVariable Long id) { return branchService.deleteById(id); }
 

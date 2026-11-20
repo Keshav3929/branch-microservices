@@ -26,7 +26,6 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 
 import java.time.LocalDate;
-import java.time.temporal.WeekFields;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -90,39 +89,13 @@ public class BranchService {
             default -> throw new BranchException(BranchException.Type.INVALID_GRANULARITY);
         };
 
-        Map<String, List<BranchResponseDto>> recordsByPeriod = branchRepository
-                .findAll(BranchSpecification.search(filters))
-                .stream()
-                .filter(branch -> branch.getCreatedAt() != null)
-                .collect(Collectors.groupingBy(
-                        branch -> creationPeriod(branch, normalizedGranularity),
-                        Collectors.mapping(this::toResponse, Collectors.toList())
-                ));
-
         List<CreationTrendsDto.TrendPoint> trends = results.stream()
-                .map(row -> {
-                    String period = row[0].toString();
-                    return new CreationTrendsDto.TrendPoint(
-                            period,
-                            ((Number) row[1]).longValue(),
-                            recordsByPeriod.getOrDefault(period, List.of())
-                    );
-                })
+                .map(row -> new CreationTrendsDto.TrendPoint(
+                        row[0].toString(),
+                        ((Number) row[1]).longValue()
+                ))
                 .toList();
         return new CreationTrendsDto(granularity, trends);
-    }
-
-    private String creationPeriod(Branch branch, String granularity) {
-        LocalDate date = branch.getCreatedAt().toLocalDate();
-        return switch (granularity) {
-            case "yearly" -> String.valueOf(date.getYear());
-            case "monthly" -> String.format("%04d-%02d", date.getYear(), date.getMonthValue());
-            case "weekly" -> String.format("%04d-W%02d",
-                    date.get(WeekFields.ISO.weekBasedYear()),
-                    date.get(WeekFields.ISO.weekOfWeekBasedYear()));
-            case "daily" -> date.toString();
-            default -> throw new BranchException(BranchException.Type.INVALID_GRANULARITY);
-        };
     }
 
     private void notifyChange(Branch saved, String operation) {
