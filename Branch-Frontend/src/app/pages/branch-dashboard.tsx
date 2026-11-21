@@ -327,7 +327,7 @@ export default function BranchDashboard() {
             return;
         }
 
-        const status = type === "total" ? [] : [type === "active" ? "Active" : "Inactive"];
+        const status = [type === "active" ? "Active" : "Inactive"];
         const next = { ...appliedFilters, status };
         setFilters(next);
         setAppliedFilters(next);
