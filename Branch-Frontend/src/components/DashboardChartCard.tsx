@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import {
     Box, Paper, Typography, ToggleButtonGroup, ToggleButton,
@@ -43,6 +43,15 @@ export default function DashboardChartCard({
     const [orderBy, setOrderBy] = useState<string>(tableColumns[0]?.key ?? "category");
     const [order, setOrder] = useState<SortOrder>("asc");
     const [dialogOpen, setDialogOpen] = useState(false);
+
+    // Reset pagination to first page when table data changes
+    const prevTableDataRef = useRef<TableBreakdownRow[]>(tableData);
+    useEffect(() => {
+        if (prevTableDataRef.current !== tableData) {
+            setPage(0);
+            prevTableDataRef.current = tableData;
+        }
+    }, [tableData]);
 
     const handleSort = (columnKey: string) => {
         const isAsc = orderBy === columnKey && order === "asc";

@@ -62,10 +62,12 @@ public class EmailNotificationService {
                     + "Regards,\nBranch Master Team");
             helper.addAttachment(
                     branch.getBranchCode() + "-" + operation.toLowerCase() + ".pdf",
-                    new ByteArrayResource(buildPdf(branch, operation)),"application/pdf"
+                    new ByteArrayResource(buildPdf(branch, operation)), "application/pdf"
             );
             mailSender.send(message);
-        } catch (Exception e) { log.error("Branch notification email failed for {}", branch.getBranchCode(), e); }
+        } catch (Exception e) {
+            log.error("Branch notification email failed for {}", branch.getBranchCode(), e);
+        }
     }
 
     private byte[] buildPdf(BranchResponseDto branch, String operation) {
@@ -88,12 +90,14 @@ public class EmailNotificationService {
                         .map(DropdownOptionDto::name)
                         .findFirst()
                         .orElse(fallback);
+            } else if (value instanceof Boolean active) {
+                value = active ? "Active" : "Inactive";
+            } else if (value instanceof LocalDateTime time) {
+                value = time.format(DATE_TIME);
             }
-            else if (value instanceof Boolean active) { value = active ? "Active" : "Inactive";}
-            else if (value instanceof LocalDateTime time) { value = time.format(DATE_TIME); }
 
-            table.addCell(StringUtils.capitalize( key.replaceAll("([a-z])([A-Z0-9])", "$1 $2").replaceFirst(" Id$", "")));
-            table.addCell( value == null || value.toString().isBlank() ? "N/A" : value.toString());
+            table.addCell(StringUtils.capitalize(key.replaceAll("([a-z])([A-Z0-9])", "$1 $2").replaceFirst(" Id$", "")));
+            table.addCell(value == null || value.toString().isBlank() ? "N/A" : value.toString());
         }
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Document document = new Document();

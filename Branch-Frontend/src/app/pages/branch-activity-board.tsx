@@ -146,6 +146,7 @@ export default function BranchManagement() {
     const resetPage = () => setPagination(p => p.pageIndex ? { ...p, pageIndex: 0 } : p);
     const statusFilter = applied.status.length === 1 ? applied.status[0] === "Active" : undefined;
     const selectedTile: Tile = statusFilter === undefined ? "total" : statusFilter ? "active" : "inactive";
+
     // Fetch dropdown options and users from shared cache on mount
     useEffect(() => {
         dispatch(fetchDropdownOptions());
@@ -278,19 +279,47 @@ export default function BranchManagement() {
         await handleExcelUpload(excelFiles[0]);
     };
 
+
     const handleExcelUpload = async (file: File) => {
+        if (!file.size) {
+            await showError("Empty file", "Please select a non-empty Excel file.");
+            return;
+        }
+
+        let workbook;
+        let sheet;
+
+        try {
+            workbook = read(await file.arrayBuffer());
+            sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+            const rows: unknown[][] = sheet
+                ? utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "", blankrows: false })
+                : [];
+
+            if (!rows.slice(2).some(row =>
+                row.some(cell => String(cell ?? "").trim() !== "")
+            )) {
+                await showError("Empty file", "Please add at least one branch record.");
+                return;
+            }
+        } catch {
+            await showError("Invalid Excel file", "Unable to read the Excel file. Please check its format.");
+            return;
+        }
+
         try {
             await validateExcelFile(file);
         } catch (err) {
             await showError("Invalid Excel file", getErrorMessage(err, "The selected Excel file failed validation."));
             return;
         }
+
         const fields = getOptionFields(optionsData);
 
         let parsed: { data: ExcelRow; errors: string[] }[];
+
         try {
-            const workbook = read(await file.arrayBuffer());
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
             parsed = utils.sheet_to_json<ExcelRow>(sheet, { range: 1, defval: "" })
                 .map(row => normalizeExcelRow(row, fields));
         } catch {
@@ -298,13 +327,9 @@ export default function BranchManagement() {
             return;
         }
 
-        if (!parsed.length) {
-            await showError("Empty file", "The selected Excel file has no data rows.");
-            return;
-        }
-
         try {
             const { data } = await saveBranches(parsed.map(p => p.data), true);
+
             const serverErrors = new Map<number, string[]>(
                 (data.invalidRows as { row: number; errors: string[] }[])
                     .map(r => [r.row, r.errors])
@@ -325,6 +350,7 @@ export default function BranchManagement() {
             await showError("Validation failed", getErrorMessage(err, "The server could not validate the file. Please try again."));
         }
     };
+
     const saveValidExcelRows = async () => {
         if (!validRows.length) return;
         setSavingExcel(true);

@@ -20,6 +20,17 @@ import java.time.LocalDateTime;
 public class NotificationService {
     private final NotificationRepository repository;
 
+    private static String verb(String operation) {
+        return switch (operation) {
+            case "CREATE" -> "created";
+            case "UPDATE" -> "updated";
+            case "ACTIVATE" -> "activated";
+            case "DEACTIVATE" -> "deactivated";
+            case "DELETE" -> "deleted";
+            default -> operation.toLowerCase();
+        };
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(String operation, BranchResponseDto branch) {
         BranchNotification n = new BranchNotification();
@@ -35,12 +46,14 @@ public class NotificationService {
     @Transactional(readOnly = true)
     public Page<NotificationDto> list(Pageable pageable) {
         return repository.findAll(
-                PageRequest.of( pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"))
+                PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"))
         ).map(NotificationDto::from);
     }
 
     @Transactional(readOnly = true)
-    public long unreadCount() { return repository.countBySeenFalse(); }
+    public long unreadCount() {
+        return repository.countBySeenFalse();
+    }
 
     @Transactional
     public void markSeen(Long id) {
@@ -50,16 +63,5 @@ public class NotificationService {
     @Transactional
     public void markAllSeen() {
         repository.markAllSeen();
-    }
-
-    private static String verb(String operation) {
-        return switch (operation) {
-            case "CREATE" -> "created";
-            case "UPDATE" -> "updated";
-            case "ACTIVATE" -> "activated";
-            case "DEACTIVATE" -> "deactivated";
-            case "DELETE" -> "deleted";
-            default -> operation.toLowerCase();
-        };
     }
 }

@@ -54,7 +54,9 @@ public class AuthenticationFilter extends OncePerRequestFilter {
                     authentication.setDetails(Long.parseLong(id));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
-            } catch (NumberFormatException ex) { SecurityContextHolder.clearContext(); }
+            } catch (NumberFormatException ex) {
+                SecurityContextHolder.clearContext();
+            }
         }
         chain.doFilter(request, response);
     }

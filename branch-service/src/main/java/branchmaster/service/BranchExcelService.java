@@ -22,8 +22,10 @@ public class BranchExcelService {
     private final BranchRepository branchRepository;
     private final CommonValidationService commonValidationService;
 
-        public BranchImportRowValidationDto validateMultiple(List<BranchRequestDto> requests) {
-        if (requests == null || requests.isEmpty()) { throw new BranchException(BranchException.Type.INVALID_ROW); }
+    public BranchImportRowValidationDto validateMultiple(List<BranchRequestDto> requests) {
+        if (requests == null || requests.isEmpty()) {
+            throw new BranchException(BranchException.Type.INVALID_ROW);
+        }
 
         List<BranchImportRowDto> valid = new ArrayList<>();
         List<BranchImportRowDto> invalid = new ArrayList<>();
