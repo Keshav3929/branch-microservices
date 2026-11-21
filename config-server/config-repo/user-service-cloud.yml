@@ -1,0 +1,5 @@
+﻿spring:
+  datasource:
+    url: "jdbc:mysql://${TIDB_HOST}:${TIDB_PORT:4000}/${TIDB_DATABASE:branch_master}?sslMode=VERIFY_IDENTITY"
+    username: ${TIDB_USERNAME}
+    password: ${TIDB_PASSWORD}
