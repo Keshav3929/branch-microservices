@@ -2,7 +2,7 @@ import axios, { isAxiosError } from "axios";
 import type {AxiosResponse} from "axios";
 import type { Branch } from "../types/BranchSchema";
 
-axios.defaults.baseURL = "http://localhost:8086";
+axios.defaults.baseURL = "https://api-gateway-y4zq.onrender.com";
 axios.defaults.paramsSerializer = { indexes: null };
 
 export interface BranchQuery { page?: number; size?: number; sort?: string }
