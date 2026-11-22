@@ -1,6 +1,7 @@
 FROM eclipse-temurin:21-jdk AS build
 WORKDIR /workspace/branch-service
 COPY branch-service/ ./
+COPY common-service/ /workspace/common-service/
 RUN chmod +x gradlew \
     && ./gradlew --no-daemon clean bootJar -x test \
     && JAR="$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' | head -n 1)" \
