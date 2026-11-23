@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
-@FeignClient(name = "oauth")
+@FeignClient(name = "oauth", url = "${OAUTH_SERVICE_URL}")
 public interface OAuthClient {
 
     @PostMapping("/oauth/token")
