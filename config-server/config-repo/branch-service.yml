@@ -46,7 +46,7 @@ branch:
     email: ${BRANCH_NOTIFICATION_EMAIL}
 
 server:
-  port: 8081
+  port: ${PORT:8081}
 
 app:
   gateway:
