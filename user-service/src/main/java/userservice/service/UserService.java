@@ -26,14 +26,36 @@ public class UserService {
     public record UserSummary(Long id, String username) {}
 
 
+
     public AuthResponse login(LoginRequest request) {
+        System.out.println("LOGIN 1: Looking up user");
+
         AppUser user = users.findByUsername(request.username().trim())
                 .orElseThrow(() -> new BranchException(BranchException.Type.USER_NOT_FOUND));
 
-        if (!encoder.matches(request.password(), user.getPassword())) throw new BranchException(BranchException.Type.WRONG_PASSWORD);
-        if (user.getStatus() != AppUser.Status.ACTIVE) throw new BranchException(BranchException.Type.ACCOUNT_INACTIVE);
-        var response = oauthClient.generateToken( serviceKey,
-                new OAuthClient.TokenRequest( user.getId(), user.getUsername(),"ROLE_" + user.getRole() ));
+        System.out.println("LOGIN 2: User found");
+
+        if (!encoder.matches(request.password(), user.getPassword()))
+            throw new BranchException(BranchException.Type.WRONG_PASSWORD);
+
+        System.out.println("LOGIN 3: Password matched");
+
+        if (user.getStatus() != AppUser.Status.ACTIVE)
+            throw new BranchException(BranchException.Type.ACCOUNT_INACTIVE);
+
+        System.out.println("LOGIN 4: Calling OAuth");
+
+        var response = oauthClient.generateToken(
+                serviceKey,
+                new OAuthClient.TokenRequest(
+                        user.getId(),
+                        user.getUsername(),
+                        "ROLE_" + user.getRole()
+                )
+        );
+
+        System.out.println("LOGIN 5: OAuth response received");
+
         return new AuthResponse(
                 response.token(),
                 user.getUsername(),
