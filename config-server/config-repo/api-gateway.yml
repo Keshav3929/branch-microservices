@@ -11,6 +11,8 @@ spring:
               uri: https://user-service-aq0h.onrender.com
               predicates:
                 - Path=/auth/**
+              filters:
+                - RemoveRequestHeader=Accept-Encoding
 
             - id: branch-service
               uri: lb://BRANCH-SERVICE
