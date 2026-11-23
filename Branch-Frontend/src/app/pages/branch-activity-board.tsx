@@ -171,13 +171,12 @@ export default function BranchManagement() {
     }, [dispatch, query]);
     useEffect(() => {
         const controller = new AbortController();
-        getCounts(dateRange, controller.signal).then(({ data }) => setCounts(data)).catch(() => { });
+        getCounts({}, controller.signal).then(({ data }) => setCounts(data)).catch(() => { });
         return () => controller.abort();
-    }, [scope, dateRange, countsVersion]);
+    }, [countsVersion]);
     const afterChange = () => {
         setCountsVersion(version => version + 1);
         setBranchesVersion(version => version + 1);
-        // Invalidate only analytics (counts change after mutations); keep dropdown/users cache valid
         dispatch(invalidateAnalytics());
         window.dispatchEvent(new Event("notifications-updated"));
     };
