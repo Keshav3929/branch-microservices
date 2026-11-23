@@ -1,6 +1,7 @@
 spring:
   application:
     name: oauth
+
   autoconfigure:
     exclude:
       - org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
@@ -8,13 +9,7 @@ spring:
   config:
     import:
       - "optional:file:.env[.properties]"
-      - "optional:configserver:"
-
-  cloud:
-    config:
-      discovery:
-        enabled: true
-        service-id: config-server
+      - "configserver:https://branch-config-server.onrender.com"
 
 server:
   port: 8084
