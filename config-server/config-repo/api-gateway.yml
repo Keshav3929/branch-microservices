@@ -8,7 +8,7 @@ spring:
         webmvc:
           routes:
             - id: user-service
-              uri: lb://USER-SERVICE
+              uri: https://user-service-aq0h.onrender.com
               predicates:
                 - Path=/auth/**
 
