@@ -171,9 +171,9 @@ export default function BranchManagement() {
     }, [dispatch, query]);
     useEffect(() => {
         const controller = new AbortController();
-        getCounts({}, controller.signal).then(({ data }) => setCounts(data)).catch(() => { });
+        getCounts(dateRange, controller.signal).then(({ data }) => setCounts(data)).catch(() => { });
         return () => controller.abort();
-    }, [countsVersion]);
+    }, [dateRange, countsVersion]);
     const afterChange = () => {
         setCountsVersion(version => version + 1);
         setBranchesVersion(version => version + 1);
