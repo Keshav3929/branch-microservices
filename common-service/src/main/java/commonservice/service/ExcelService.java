@@ -37,7 +37,7 @@ public class ExcelService {
             sheetName = "Branch Template";
             headers = BRANCH_HEADERS;
         } else {
-            throw new IllegalArgumentException( "Unsupported Excel template type: " + request.templateType() );
+            throw new IllegalArgumentException("Unsupported Excel template type: " + request.templateType());
         }
 
         WorkbookUtil.validateSheetName(sheetName);

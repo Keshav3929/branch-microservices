@@ -13,7 +13,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity http, ApiKeyFilter apiKeyFilter) throws Exception {
+            HttpSecurity http, ApiKeyFilter apiKeyFilter) {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)

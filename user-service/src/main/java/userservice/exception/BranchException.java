@@ -7,6 +7,14 @@ import org.springframework.http.HttpStatus;
 @Getter
 public class BranchException extends RuntimeException {
 
+    private final HttpStatus status;
+    private final String field;
+    public BranchException(Type type) {
+        super(type.getMessage());
+        this.status = type.getStatus();
+        this.field = type.getField();
+    }
+
     @Getter
     @RequiredArgsConstructor
     public enum Type {
@@ -18,14 +26,5 @@ public class BranchException extends RuntimeException {
         private final String message;
         private final HttpStatus status;
         private final String field;
-    }
-
-    private final HttpStatus status;
-    private final String field;
-
-    public BranchException(Type type) {
-        super(type.getMessage());
-        this.status = type.getStatus();
-        this.field = type.getField();
     }
 }

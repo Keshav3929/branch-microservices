@@ -40,27 +40,34 @@ public class BranchController {
     @PostMapping("branch/save-multiple")
     public ResponseEntity<?> save(
             @RequestBody List<BranchRequestDto> requests, @RequestParam(defaultValue = "false") boolean validateOnly) {
-        return ResponseEntity.ok( validateOnly ? branchExcelService.validateMultiple(requests) : branchService.save(requests)); }
-
-    @GetMapping("branch/list")
-    public Page<BranchResponseDto> getAll(Pageable pageable) { return branchService.getAll(pageable); }
+        return ResponseEntity.ok(validateOnly ? branchExcelService.validateMultiple(requests) : branchService.save(requests));
+    }
 
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("branch/delete/{id}")
-    public String deleteById(@PathVariable Long id) { return branchService.deleteById(id); }
+    public String deleteById(@PathVariable Long id) {
+        return branchService.deleteById(id);
+    }
 
     @GetMapping("branch/search")
-    public Page<BranchResponseDto> search(BranchSearchRequestDto request, @PageableDefault(size = 10) Pageable pageable) {
-        return branchService.search(request, pageable); }
+    public Page<BranchResponseDto> search(BranchSearchRequestDto request, @PageableDefault() Pageable pageable) {
+        return branchService.search(request, pageable);
+    }
 
     @GetMapping("branch/counts")
-    public Map<String, Long> counts(BranchSearchRequestDto request) { return branchService.counts(request); }
+    public Map<String, Long> counts(BranchSearchRequestDto request) {
+        return branchService.counts(request);
+    }
 
     @GetMapping("branch/history/{branchId}")
-    public List<BranchHistoryDto> getHistory(@PathVariable Long branchId) { return branchService.getHistory(branchId); }
+    public List<BranchHistoryDto> getHistory(@PathVariable Long branchId) {
+        return branchService.getHistory(branchId);
+    }
 
     @GetMapping("branch/analytics")
-    public BranchAnalyticsDto getAnalytics() { return branchService.getAnalytics(); }
+    public BranchAnalyticsDto getAnalytics() {
+        return branchService.getAnalytics();
+    }
 
     @GetMapping("branch/creation-trends")
     public CreationTrendsDto getCreationTrends(
@@ -72,7 +79,8 @@ public class BranchController {
     @GetMapping("notifications")
     public Page<NotificationDto> listNotifications(
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "5") int size) {
-        return notificationService.list(PageRequest.of(page, size)); }
+        return notificationService.list(PageRequest.of(page, size));
+    }
 
     @PutMapping("notifications/{id}/seen")
     public void markSeen(@PathVariable Long id) {

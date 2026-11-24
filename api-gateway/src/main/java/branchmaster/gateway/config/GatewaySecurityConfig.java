@@ -18,7 +18,7 @@ public class GatewaySecurityConfig {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationFilter jwtAuthenticationFilter,
-            CorsConfigurationSource corsConfigurationSource) throws Exception {
+            CorsConfigurationSource corsConfigurationSource) {
 
         http
                 .csrf(AbstractHttpConfigurer::disable)

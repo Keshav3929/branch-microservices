@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import { searchBranches, getBranches } from "../app/branchApi";
+import { searchBranches } from "../app/branchApi";
 import type { Branch } from "../types/BranchSchema";
 import type { BranchQuery, BranchSearchRequest } from "../app/branchApi";
 
@@ -15,19 +15,10 @@ const initialState: BranchState = {
     branches: [], totalElements: 0, loading: false, error: null, currentRequestId: undefined
 };
 
-export const hasFilters = (f: BranchSearchRequest) =>
-    Object.entries(f).some(([, value]) => {
-        if (value == null || value === "") return false;
-        if (Array.isArray(value)) return value.length > 0;
-        return true;
-    });
-
 export const fetchBranches = createAsyncThunk(
     "branch/fetchBranches",
     async ({ filters, page }: { filters: BranchSearchRequest; page: BranchQuery }, { signal }) => {
-        const { data } = hasFilters(filters)
-            ? await searchBranches(filters, page, signal)
-            : await getBranches(page, signal);
+        const { data } = await searchBranches(filters, page, signal);
         return { content: data?.content ?? [], totalElements: data?.totalElements ?? 0 };
     }
 );

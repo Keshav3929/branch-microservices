@@ -13,8 +13,15 @@ public record BranchAnalyticsDto(
         List<CreationStats> creationTrends
 ) implements Serializable {
 
-    public record RegionStats(String name, long active, long inactive) implements Serializable {}
-    public record TypeStats(String name, long count) implements Serializable {}
-    public record OrganizationStats(String name, long count) implements Serializable {}
-    public record CreationStats(String date, long count) implements Serializable {}
+    public record RegionStats(String name, long active, long inactive) implements Serializable {
+    }
+
+    public record TypeStats(String name, long count) implements Serializable {
+    }
+
+    public record OrganizationStats(String name, long count) implements Serializable {
+    }
+
+    public record CreationStats(String date, long count) implements Serializable {
+    }
 }

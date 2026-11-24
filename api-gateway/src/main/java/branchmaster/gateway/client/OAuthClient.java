@@ -12,5 +12,6 @@ public interface OAuthClient {
             @RequestHeader("X-Service-Key") String serviceKey,
             @RequestHeader("Authorization") String token);
 
-    record ValidationResponse(Long id, String username, String role) {}
+    record ValidationResponse(Long id, String username, String role) {
+    }
 }

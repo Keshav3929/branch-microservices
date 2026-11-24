@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 
 @Service
@@ -18,22 +19,20 @@ import java.util.List;
 public class UserService {
 
     private final OAuthClient oauthClient;
-
-    @Value("${app.oauth.service-key}")
-    private String serviceKey;
     private final UserRepository users;
     private final PasswordEncoder encoder;
-    public record UserSummary(Long id, String username) {}
-
+    @Value("${app.oauth.service-key}")
+    private String serviceKey;
 
     public AuthResponse login(LoginRequest request) {
         AppUser user = users.findByUsername(request.username().trim())
                 .orElseThrow(() -> new BranchException(BranchException.Type.USER_NOT_FOUND));
 
-        if (!encoder.matches(request.password(), user.getPassword())) throw new BranchException(BranchException.Type.WRONG_PASSWORD);
+        if (!encoder.matches(request.password(), user.getPassword()))
+            throw new BranchException(BranchException.Type.WRONG_PASSWORD);
         if (user.getStatus() != AppUser.Status.ACTIVE) throw new BranchException(BranchException.Type.ACCOUNT_INACTIVE);
-        var response = oauthClient.generateToken( serviceKey,
-                new OAuthClient.TokenRequest( user.getId(), user.getUsername(),"ROLE_" + user.getRole() ));
+        var response = oauthClient.generateToken(serviceKey,
+                new OAuthClient.TokenRequest(user.getId(), user.getUsername(), "ROLE_" + user.getRole()));
         return new AuthResponse(
                 response.token(),
                 user.getUsername(),
@@ -57,5 +56,8 @@ public class UserService {
         return users.findAll().stream()
                 .map(user -> new UserSummary(user.getId(), user.getUsername()))
                 .toList();
+    }
+
+    public record UserSummary(Long id, String username) {
     }
 }

@@ -81,18 +81,22 @@ public class BranchService {
         String branchType = (filters.getBranchType() != null && !filters.getBranchType().isEmpty()) ? filters.getBranchType().getFirst() : null;
         String normalizedGranularity = granularity == null ? "" : granularity.trim().toLowerCase(Locale.ROOT);
 
-        List<Object[]> results = switch (normalizedGranularity) {
-            case "yearly" -> branchRepository.countByCreationYear(status, organizationId, regionId, countryId, branchType, createdDateFrom, createdDateTo);
-            case "monthly" -> branchRepository.countByCreationMonth(status, organizationId, regionId, countryId, branchType, createdDateFrom, createdDateTo);
-            case "weekly" -> branchRepository.countByCreationWeek(status, organizationId, regionId, countryId, branchType, createdDateFrom, createdDateTo);
-            case "daily" -> branchRepository.countByCreationDayFiltered(status, organizationId, regionId, countryId, branchType, createdDateFrom, createdDateTo);
+        List<BranchRepository.CreationTrend> results = switch (normalizedGranularity) {
+            case "yearly" ->
+                    branchRepository.countByCreationYear(status, organizationId, regionId, countryId, branchType, createdDateFrom, createdDateTo);
+            case "monthly" ->
+                    branchRepository.countByCreationMonth(status, organizationId, regionId, countryId, branchType, createdDateFrom, createdDateTo);
+            case "weekly" ->
+                    branchRepository.countByCreationWeek(status, organizationId, regionId, countryId, branchType, createdDateFrom, createdDateTo);
+            case "daily" ->
+                    branchRepository.countByCreationDayFiltered(status, organizationId, regionId, countryId, branchType, createdDateFrom, createdDateTo);
             default -> throw new BranchException(BranchException.Type.INVALID_GRANULARITY);
         };
 
         List<CreationTrendsDto.TrendPoint> trends = results.stream()
                 .map(row -> new CreationTrendsDto.TrendPoint(
-                        row[0].toString(),
-                        ((Number) row[1]).longValue()
+                        row.getPeriod(),
+                        row.getCount()
                 ))
                 .toList();
         return new CreationTrendsDto(granularity, trends);
@@ -128,7 +132,9 @@ public class BranchService {
 
         BranchImportRowValidationDto result = branchExcelService.validateMultiple(requests);
 
-        if (!result.getInvalidRows().isEmpty()) { throw new BranchException(result); }
+        if (!result.getInvalidRows().isEmpty()) {
+            throw new BranchException(result);
+        }
         return requests.stream().map(request -> {
             boolean isNew = request.getId() == null;
             Branch branch = isNew ? new Branch() : getBranch(request.getId());
@@ -151,10 +157,6 @@ public class BranchService {
 
             return toResponse(saved);
         }).toList();
-    }
-
-    public Page<BranchResponseDto> getAll(Pageable pageable) {
-        return branchRepository.findAll(pageable).map(this::toResponse);
     }
 
     @CacheEvict(cacheNames = "branchAnalytics", allEntries = true)
@@ -187,15 +189,16 @@ public class BranchService {
         var organizationNames = organizationsData.organizations().stream()
                 .collect(Collectors.toMap(DropdownOptionsDto.DropdownOptionDto::id, DropdownOptionsDto.DropdownOptionDto::name));
         var regions = branchRepository.countByRegion().stream()
-                .map(row -> new BranchAnalyticsDto.RegionStats(regionNames.getOrDefault(((Number) row[0]).longValue(), "Unknown"),
-                        ((Number) row[1]).longValue(), ((Number) row[2]).longValue())).toList();
+                .map(row -> new BranchAnalyticsDto.RegionStats(
+                        regionNames.getOrDefault(row.getRegionId(), "Unknown"),
+                        row.getActive(), row.getInactive())).toList();
         var types = branchRepository.countByBranchType().stream()
-                .map(row -> new BranchAnalyticsDto.TypeStats((String) row[0], ((Number) row[1]).longValue())).toList();
+                .map(row -> new BranchAnalyticsDto.TypeStats(row.getBranchType(), row.getCount())).toList();
         var organizationStats = branchRepository.countByOrganization().stream()
                 .map(row -> new BranchAnalyticsDto.OrganizationStats(
-                        organizationNames.getOrDefault(((Number) row[0]).longValue(), "Unknown"), ((Number) row[1]).longValue())).toList();
+                        organizationNames.getOrDefault(row.getOrganizationId(), "Unknown"), row.getCount())).toList();
         var creationTrends = branchRepository.countByCreationDay().stream()
-                .map(row -> new BranchAnalyticsDto.CreationStats(row[0].toString(), ((Number) row[1]).longValue())).toList();
+                .map(row -> new BranchAnalyticsDto.CreationStats(row.getDate(), row.getCount())).toList();
         Map<String, Long> counts = counts(new BranchSearchRequestDto());
         return new BranchAnalyticsDto(counts.get("total"), counts.get("active"), counts.get("inactive"), regions, types, organizationStats, creationTrends);
     }

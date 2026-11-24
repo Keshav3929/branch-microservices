@@ -7,4 +7,5 @@ public record ExcelValidationResponseDto(
         List<String> errors,
         List<String> headers,
         int dataRows
-) {}
+) {
+}

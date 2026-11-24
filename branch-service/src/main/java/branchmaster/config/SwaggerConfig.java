@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SwaggerConfig {
     @Bean
-    public OpenAPI anyCustomConfig(){
+    public OpenAPI anyCustomConfig() {
         return new OpenAPI().info(new Info().title("Branch Master Api Documentation").description("By App"));
     }
 }

@@ -1,4 +1,3 @@
-
 package oauth.controller;
 
 import lombok.RequiredArgsConstructor;
@@ -17,10 +16,6 @@ import org.springframework.web.server.ResponseStatusException;
 public class OAuthController {
 
     private final JwtService jwtService;
-
-    public record TokenRequest(Long id, String username, String role) {}
-    public record TokenResponse(String token) {}
-    public record ValidationResponse(Long id, String username, String role) {}
 
     @PostMapping("/token")
     public TokenResponse generateToken(@RequestBody TokenRequest request) {
@@ -48,5 +43,14 @@ public class OAuthController {
                 jwtService.extractUsername(token),
                 jwtService.extractRole(token)
         );
+    }
+
+    public record TokenRequest(Long id, String username, String role) {
+    }
+
+    public record TokenResponse(String token) {
+    }
+
+    public record ValidationResponse(Long id, String username, String role) {
     }
 }

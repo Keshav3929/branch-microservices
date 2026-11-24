@@ -61,8 +61,6 @@ export const getDropdownOptions = async (): Promise<AxiosResponse<DropdownOption
 export const saveBranches = (branches: object[], validateOnly = false) =>
     axios.post("branch/save-multiple", branches, { params: validateOnly ? { validateOnly } : undefined });
 
-export const getBranches = (params?: BranchQuery, signal?: AbortSignal) => axios.get("branch/list", { params, signal });
-
 export const searchBranches = (filters: BranchSearchRequest, page?: BranchQuery, signal?: AbortSignal) =>
     axios.get("branch/search", { params: { ...filters, ...page }, signal });
 

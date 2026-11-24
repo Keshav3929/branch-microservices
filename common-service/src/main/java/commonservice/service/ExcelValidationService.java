@@ -34,7 +34,8 @@ public class ExcelValidationService {
         List<String> errors = new ArrayList<>();
         List<String> headers = new ArrayList<>();
 
-        if (file == null || file.isEmpty()) { errors.add("Excel file is empty");
+        if (file == null || file.isEmpty()) {
+            errors.add("Excel file is empty");
             return new ExcelValidationResponseDto(false, errors, headers, 0);
         }
         if (file.getSize() > maxFileSize) {
@@ -48,7 +49,8 @@ public class ExcelValidationService {
             return new ExcelValidationResponseDto(false, errors, headers, 0);
         }
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
-            if (workbook.getNumberOfSheets() == 0) { errors.add("Excel workbook contains no sheets");
+            if (workbook.getNumberOfSheets() == 0) {
+                errors.add("Excel workbook contains no sheets");
                 return new ExcelValidationResponseDto(false, errors, headers, 0);
             }
             Sheet sheet = workbook.getSheetAt(0);
@@ -57,10 +59,12 @@ public class ExcelValidationService {
             int headerRowIndex = isRequirementRow(sheet.getRow(0), formatter) ? 1 : 0;
             Row headerRow = sheet.getRow(headerRowIndex);
 
-            if (headerRow == null) { errors.add("Excel header row is missing");
+            if (headerRow == null) {
+                errors.add("Excel header row is missing");
                 return new ExcelValidationResponseDto(false, errors, headers, 0);
             }
-            if (headerRow.getLastCellNum() <= 0) { errors.add("Excel headers are missing");
+            if (headerRow.getLastCellNum() <= 0) {
+                errors.add("Excel headers are missing");
                 return new ExcelValidationResponseDto(false, errors, headers, 0);
             }
             Set<String> uniqueHeaders = new HashSet<>();
@@ -69,11 +73,14 @@ public class ExcelValidationService {
                 Cell cell = headerRow.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
                 String header = cell == null ? "" : formatter.formatCellValue(cell).trim();
 
-                if (header.isEmpty()) { errors.add("Column " + (i + 1) + " has an empty header");
+                if (header.isEmpty()) {
+                    errors.add("Column " + (i + 1) + " has an empty header");
                     continue;
                 }
                 headers.add(header);
-                if (!uniqueHeaders.add(normalizeHeader(header))) { errors.add("Duplicate column header: " + header); }
+                if (!uniqueHeaders.add(normalizeHeader(header))) {
+                    errors.add("Duplicate column header: " + header);
+                }
             }
 
             Set<String> actualHeaders = new HashSet<>();
@@ -89,11 +96,16 @@ public class ExcelValidationService {
 
             for (int i = headerRowIndex + 1; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
-                if (row != null && hasData(row, formatter)) { dataRows++; }
+                if (row != null && hasData(row, formatter)) {
+                    dataRows++;
+                }
             }
-            if (dataRows == 0 && requireDataRows) { errors.add("Excel file contains no data rows"); }
+            if (dataRows == 0 && requireDataRows) {
+                errors.add("Excel file contains no data rows");
+            }
             return new ExcelValidationResponseDto(errors.isEmpty(), errors, headers, dataRows);
-        } catch (IOException | RuntimeException e) { errors.add("Invalid or corrupted XLSX file");
+        } catch (IOException | RuntimeException e) {
+            errors.add("Invalid or corrupted XLSX file");
             return new ExcelValidationResponseDto(false, errors, headers, 0);
         }
     }
@@ -110,14 +122,17 @@ public class ExcelValidationService {
             if (value.isEmpty()) continue;
             if (!value.equalsIgnoreCase("Mandatory") && !value.equalsIgnoreCase("Optional")) {
                 return false;
-            } found = true;
+            }
+            found = true;
         }
         return found;
     }
 
     private boolean hasData(Row row, DataFormatter formatter) {
         for (Cell cell : row) {
-            if (!formatter.formatCellValue(cell).isBlank()) { return true; }
+            if (!formatter.formatCellValue(cell).isBlank()) {
+                return true;
+            }
         }
         return false;
     }

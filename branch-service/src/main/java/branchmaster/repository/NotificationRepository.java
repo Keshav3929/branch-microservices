@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface NotificationRepository extends JpaRepository<BranchNotification, Long> {
     long countBySeenFalse();
+
     @Modifying(clearAutomatically = true)
     @Query("update BranchNotification n set n.seen = true where n.seen = false")
     void markAllSeen();

@@ -17,7 +17,7 @@ import DashboardStatTiles from "../../components/DashboardStatTiles";
 import DashboardFilterBar from "./dashboard-filter";
 import BranchDrilldownDialog from "../../components/BranchDrilldownDialog";
 import { getFilterChips, exportBranchExcel } from "../branchUtils";
-import { searchBranches, getBranches, getAnalytics, getCreationTrends } from "../branchApi";
+import { searchBranches, getAnalytics, getCreationTrends } from "../branchApi";
 import type { BranchAnalytics, DropdownOptions, BranchSearchRequest, CreationTrendsResponse } from "../branchApi";
 import type { Branch } from "../../types/BranchSchema";
 import type { ChartEngine, TableBreakdownRow, DrilldownPayload } from "../../types/chartTypes";
@@ -245,9 +245,7 @@ export default function BranchDashboard() {
         setLoading(true);
 
         const pageSize = Math.max(totalBranchesCountRef.current, 1);
-        const fetchPromise = hasFilter
-            ? searchBranches(searchReq, { page: 0, size: pageSize }, controller.signal)
-            : getBranches({ page: 0, size: pageSize }, controller.signal);
+        const fetchPromise = searchBranches(searchReq, { page: 0, size: pageSize }, controller.signal);
 
         fetchPromise.then(res => {
             const page = res.data;
@@ -394,9 +392,7 @@ export default function BranchDashboard() {
         const controller = new AbortController();
 
         try {
-            const fetchPromise = hasFilter
-                ? searchBranches(searchReq, { page: 0, size: totalFilteredCount }, controller.signal)
-                : getBranches({ page: 0, size: totalFilteredCount }, controller.signal);
+            const fetchPromise = searchBranches(searchReq, { page: 0, size: totalFilteredCount }, controller.signal);
 
             const res = await fetchPromise;
             const list = res.data?.content ?? [];

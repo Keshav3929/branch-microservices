@@ -13,14 +13,17 @@ public interface OAuthClient {
             @RequestHeader("X-Service-Key") String serviceKey,
             @RequestBody TokenRequest request);
 
-    record TokenRequest(Long id, String username, String role) {}
-
-    record TokenResponse(String token) {}
-
     @PostMapping("/oauth/validate")
     ValidationResponse validateToken(
             @RequestHeader("X-Service-Key") String serviceKey,
             @RequestHeader("Authorization") String token);
 
-    record ValidationResponse(Long id, String username, String role) {}
+    record TokenRequest(Long id, String username, String role) {
+    }
+
+    record TokenResponse(String token) {
+    }
+
+    record ValidationResponse(Long id, String username, String role) {
+    }
 }

@@ -11,6 +11,7 @@ public class BranchException extends RuntimeException {
     private final HttpStatus status;
     private final String field;
     private final BranchImportRowValidationDto result;
+
     public BranchException(Type type) {
         super(type.getMessage());
         this.status = type.getStatus();

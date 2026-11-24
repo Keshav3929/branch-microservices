@@ -13,8 +13,6 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    public record ApiError(String message, Map<String, String> errors) {}
-
     @ExceptionHandler(BranchException.class)
     public ResponseEntity<ApiError> handle(BranchException e) {
         return ResponseEntity.status(e.getStatus()).body(new ApiError(
@@ -44,5 +42,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handle(Exception e) {
         System.err.println("Unhandled error: " + e.getMessage());
         return ResponseEntity.status(500).body(new ApiError("Internal server error", Map.of()));
+    }
+
+    public record ApiError(String message, Map<String, String> errors) {
     }
 }

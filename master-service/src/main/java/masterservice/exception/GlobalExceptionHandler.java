@@ -15,8 +15,6 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    public record ApiError(String message, Map<String, String> errors) {}
-
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handle(MethodArgumentNotValidException e) {
         Map<String, String> errors = new LinkedHashMap<>();
@@ -39,5 +37,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handle(Exception e) {
         log.error("Unhandled error", e);
         return ResponseEntity.status(500).body(new ApiError("Internal server error", Map.of()));
+    }
+
+    public record ApiError(String message, Map<String, String> errors) {
     }
 }

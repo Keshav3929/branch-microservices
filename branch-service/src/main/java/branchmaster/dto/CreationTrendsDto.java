@@ -11,5 +11,6 @@ public record CreationTrendsDto(
     public record TrendPoint(
             String period,
             long count
-    ) implements Serializable {}
+    ) implements Serializable {
+    }
 }
