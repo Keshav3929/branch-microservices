@@ -24,9 +24,10 @@ import type { ChartEngine, TableBreakdownRow, DrilldownPayload } from "../../typ
 import type { BranchFilters, FilterChip } from "./branch-filter";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch } from "../../redux/store";
-import { fetchAnalytics, fetchDropdownOptions, fetchUsers, selectFreshAnalytics, selectFreshDropdownOptions, selectFreshUsers } from "../../redux/cacheSlice";
+import { fetchDropdownOptions, fetchUsers, selectFreshDropdownOptions, selectFreshUsers } from "../../redux/cacheSlice";
 import { formatDate } from "../filterUtils";
 import dayjs from "dayjs";
+import type { MRT_PaginationState, MRT_SortingState } from "material-react-table";
 
 const defaultFilters = (): BranchFilters => {
     const now = dayjs();
@@ -48,41 +49,6 @@ const emptyOptions: DropdownOptions = {
     organizations: [], branchTypes: [], regions: [], countries: [],
     states: [], cities: [], contactPersons: [], workingHours: []
 };
-
-function computeAnalytics(branches: Branch[], options: DropdownOptions): BranchAnalytics {
-    const total = branches.length;
-    const active = branches.filter(b => b.status).length;
-    const inactive = total - active;
-    const regMap = new Map<number | string, { name: string; active: number; inactive: number }>();
-    const orgMap = new Map<number | string, { name: string; count: number }>();
-    const typeMap = new Map<string, number>();
-    const trendsMap = new Map<string, number>();
-    branches.forEach(b => {
-        const rId = b.regionId ?? "Unknown";
-        const rName = b.regionId != null ? (options.regions.find(r => r.id === b.regionId)?.name ?? `Region ${b.regionId}`) : "Unknown";
-        const reg = regMap.get(rId) ?? { name: rName, active: 0, inactive: 0 };
-        if (b.status) reg.active++; else reg.inactive++;
-        regMap.set(rId, reg);
-        const oId = b.organizationId ?? "Unknown";
-        const oName = b.organizationId != null ? (options.organizations.find(o => o.id === b.organizationId)?.name ?? `Org ${b.organizationId}`) : "Unknown";
-        const org = orgMap.get(oId) ?? { name: oName, count: 0 };
-        org.count++;
-        orgMap.set(oId, org);
-        const t = b.branchType || "Other";
-        typeMap.set(t, (typeMap.get(t) ?? 0) + 1);
-        if (b.createdAt) {
-            const dateStr = b.createdAt.slice(0, 10);
-            trendsMap.set(dateStr, (trendsMap.get(dateStr) ?? 0) + 1);
-        }
-    });
-    return {
-        total, active, inactive,
-        branchesByRegion: Array.from(regMap.values()),
-        branchesByOrganization: Array.from(orgMap.values()),
-        branchesByType: Array.from(typeMap, ([name, count]) => ({ name, count })),
-        creationTrends: Array.from(trendsMap, ([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date))
-    };
-}
 
 type TrendLevel = "yearly" | "monthly" | "weekly" | "daily";
 
@@ -117,7 +83,6 @@ export default function BranchDashboard() {
     const [engine, setEngine] = useState<ChartEngine>("recharts");
     const [analytics, setAnalytics] = useState<BranchAnalytics | null>(null);
     const [overallAnalytics, setOverallAnalytics] = useState<BranchAnalytics | null>(null);
-    const [allBranches, setAllBranches] = useState<Branch[]>([]);
     const [totalFilteredCount, setTotalFilteredCount] = useState<number>(0);
     const [loading, setLoading] = useState(true);
     const [failed, setFailed] = useState(false);
@@ -127,6 +92,12 @@ export default function BranchDashboard() {
     const [drilldownBranches, setDrilldownBranches] = useState<Branch[]>([]);
     const [drilldownOpen, setDrilldownOpen] = useState(false);
     const [drilldownLoading, setDrilldownLoading] = useState(false);
+    const [drilldownPagination, setDrilldownPagination] = useState<MRT_PaginationState>({
+        pageIndex: 0, pageSize: 10
+    });
+    const [drilldownSorting, setDrilldownSorting] = useState<MRT_SortingState>([]);
+    const [drilldownRowCount, setDrilldownRowCount] = useState(0);
+    const [drilldownError, setDrilldownError] = useState(false);
     const drilldownRequestId = useRef(0);
     const initialLoadComplete = useRef(false);
     // Creation Trends state
@@ -139,7 +110,6 @@ export default function BranchDashboard() {
     const optionsData = useSelector(selectFreshDropdownOptions) ?? emptyOptions;
     const rawUsers = useSelector(selectFreshUsers);
     const users = useMemo(() => rawUsers ?? [], [rawUsers]);
-    const cachedAnalytics = useSelector(selectFreshAnalytics);
     const availableMonths = useMemo(() => {
         const months = new Set<string>();
         (analytics?.creationTrends ?? []).forEach(item => {
@@ -153,11 +123,8 @@ export default function BranchDashboard() {
         () => availableMonths[0] ?? dayjs().format("YYYY-MM"),
         [availableMonths]
     );
-    const totalBranchesCountRef = useRef(1);
-    useEffect(() => {
-        const t = overallAnalytics?.total ?? analytics?.total;
-        if (t) totalBranchesCountRef.current = Math.max(t, 1);
-    }, [overallAnalytics?.total, analytics?.total]);
+    const trendAbortRef = useRef<AbortController | null>(null);
+    const analyticsAbortRef = useRef<AbortController | null>(null);
     // Build search request from applied filters
     const buildSearchRequest = useCallback((filterObj: BranchFilters): BranchSearchRequest => {
         const statusVal = filterObj.status.length === 1 ? filterObj.status[0] === "Active" : undefined;
@@ -199,85 +166,129 @@ export default function BranchDashboard() {
             if (!signal.aborted) setCreationTrendsLoading(false);
         }
     }, [buildSearchRequest]);
-    // Initial load: Fetch from shared cache
-    const initialAppliedFilters = useRef(appliedFilters);
+
+    // Refresh handler - preserves filters, refreshes data in place
+    const handleRefresh = useCallback(() => {
+        const searchReq = buildSearchRequest(appliedFilters);
+
+        analyticsAbortRef.current?.abort();
+
+        const controller = new AbortController();
+        analyticsAbortRef.current = controller;
+
+        setFailed(false);
+        setLoading(true);
+
+        getAnalytics(searchReq, controller.signal)
+            .then(res => {
+                if (controller.signal.aborted) return;
+                setAnalytics(res.data);
+                setOverallAnalytics(res.data);
+                setTotalFilteredCount(res.data.total);
+            })
+            .catch(err => {
+                if (!isCancel(err) && !controller.signal.aborted) {
+                    setFailed(true);
+                }
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) {
+                    setLoading(false);
+                }
+            });
+
+        trendAbortRef.current?.abort();
+
+        const trendController = new AbortController();
+        trendAbortRef.current = trendController;
+
+        fetchCreationTrends(
+            creationTrendsLevel,
+            appliedFilters,
+            trendController.signal,
+            creationTrendsLevel === "weekly" ? weeklySelectedMonth : undefined
+        );
+    }, [
+        appliedFilters,
+        creationTrendsLevel,
+        weeklySelectedMonth,
+        buildSearchRequest,
+        fetchCreationTrends
+    ]);
+
     useEffect(() => {
+
         const controller = new AbortController();
         const loadDashboard = async () => {
             try {
-                const [initialOptions, , analyticsResult] = await Promise.all([
+                const [, , analyticsResult] = await Promise.all([
                     dispatch(fetchDropdownOptions()).unwrap(),
                     dispatch(fetchUsers()).unwrap(),
-                    dispatch(fetchAnalytics()).unwrap(),
+                    getAnalytics(buildSearchRequest(appliedFilters), controller.signal),
                 ]);
+
                 if (controller.signal.aborted) return;
-                const analyticsData = analyticsResult;
-                if (analyticsData) {
-                    setOverallAnalytics(analyticsData);
-                    const initialSearch = buildSearchRequest(initialAppliedFilters.current);
-                    const branchRes = await searchBranches(
-                        initialSearch,
-                        { page: 0, size: Math.max(analyticsData.total || 1, 1) },
-                        controller.signal
-                    );
-                    if (controller.signal.aborted) return;
-                    const list = branchRes.data?.content ?? [];
-                    setAllBranches(list);
-                    setTotalFilteredCount(branchRes.data?.totalElements ?? list.length);
-                    setAnalytics(computeAnalytics(list, initialOptions));
-                    initialLoadComplete.current = true;
-                }
+
+                setOverallAnalytics(analyticsResult.data);
+                setAnalytics(analyticsResult.data);
+                setTotalFilteredCount(analyticsResult.data.total);
+
+                initialLoadComplete.current = true;
             } catch (err) {
-                if (!isCancel(err)) setFailed(true);
+                if (!controller.signal.aborted && !isCancel(err)) {
+                    setFailed(true);
+                }
             } finally {
                 if (!controller.signal.aborted) setLoading(false);
             }
         };
+
         loadDashboard();
+
         return () => controller.abort();
-    }, [dispatch, buildSearchRequest]);
+    }, [dispatch]);
     // Filter change effect
     useEffect(() => {
         if (!initialLoadComplete.current) return;
+
         const searchReq = buildSearchRequest(appliedFilters);
-        const hasFilter = Object.values(searchReq).some(v => v !== undefined);
+        analyticsAbortRef.current?.abort();
+
         const controller = new AbortController();
+        analyticsAbortRef.current = controller;
+
+        setFailed(false);
         setLoading(true);
 
-        const pageSize = Math.max(totalBranchesCountRef.current, 1);
-        const fetchPromise = searchBranches(searchReq, { page: 0, size: pageSize }, controller.signal);
-
-        fetchPromise.then(res => {
-            const page = res.data;
-            const list = page?.content ?? [];
-            setAllBranches(list);
-            setTotalFilteredCount(page?.totalElements ?? list.length);
-            if (hasFilter) {
-                setAnalytics(computeAnalytics(list, optionsData));
-            } else {
-                if (cachedAnalytics) {
-                    setAnalytics(cachedAnalytics);
-                    setOverallAnalytics(cachedAnalytics);
-                } else {
-                    getAnalytics(controller.signal)
-                        .then(aRes => {
-                            setAnalytics(aRes.data);
-                            setOverallAnalytics(aRes.data);
-                        })
-                        .catch(() => { });
+        getAnalytics(searchReq, controller.signal)
+            .then(res => {
+                if (controller.signal.aborted) return;
+                setAnalytics(res.data);
+                setOverallAnalytics(res.data);
+                setTotalFilteredCount(res.data.total);
+            })
+            .catch(err => {
+                if (!isCancel(err) && !controller.signal.aborted) {
+                    setFailed(true);
                 }
-            }
-            setLoading(false);
-        }).catch(err => {
-            if (!isCancel(err)) setFailed(true);
-            setLoading(false);
-        });
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) {
+                    setLoading(false);
+                }
+            });
+
         return () => controller.abort();
-    }, [appliedFilters, optionsData, cachedAnalytics, buildSearchRequest]);
+    }, [appliedFilters, buildSearchRequest]);
 
     // Fetch creation trends when level or appliedFilters change
     useEffect(() => {
+        // Abort previous trend request
+        if (trendAbortRef.current) {
+            trendAbortRef.current.abort();
+        }
         const controller = new AbortController();
+        trendAbortRef.current = controller;
         const month = creationTrendsLevel === "weekly"
             ? (weeklySelectedMonth || currentMonth)
             : undefined;
@@ -285,6 +296,13 @@ export default function BranchDashboard() {
         void fetchCreationTrends(creationTrendsLevel, appliedFilters, controller.signal, month);
         return () => controller.abort();
     }, [creationTrendsLevel, appliedFilters, weeklySelectedMonth, currentMonth, fetchCreationTrends]);
+
+    useEffect(() => {
+        return () => {
+            analyticsAbortRef.current?.abort();
+            trendAbortRef.current?.abort();
+        };
+    }, []);
 
     const handleApplyFilters = (next?: BranchFilters) => {
         const target = next ? { ...next } : { ...filters };
@@ -332,68 +350,108 @@ export default function BranchDashboard() {
     };
 
     // Drilldown from table counts (not from charts anymore)
-    const handleTableDrilldown = useCallback(async (payload: DrilldownPayload) => {
+    const handleTableDrilldown = useCallback((payload: DrilldownPayload) => {
         setDrilldown(payload);
+        setDrilldownBranches([]);
+        setDrilldownRowCount(0);
+        setDrilldownPagination(prev => ({ ...prev, pageIndex: 0 }));
+        setDrilldownSorting([]);
         setDrilldownOpen(true);
+    }, []);
+    useEffect(() => {
+        if (!drilldownOpen || !drilldown) return;
 
-        if (payload.source === "trends") {
-            const period = String(payload.value ?? "");
-            const dateRange = getTrendDateRange(period);
-            if (!dateRange) {
+        const controller = new AbortController();
+        const requestId = ++drilldownRequestId.current;
+        setDrilldownLoading(false);
+        const filters = buildSearchRequest(appliedFilters);
+        const value = String(drilldown.value ?? "");
+
+        if (drilldown.source === "status") {
+            if (value.toLowerCase() !== "active" && value.toLowerCase() !== "inactive") {
                 setDrilldownBranches([]);
+                setDrilldownRowCount(0);
                 return;
             }
-
-            const requestId = ++drilldownRequestId.current;
-            setDrilldownLoading(true);
-            setDrilldownBranches([]);
-            try {
-                const searchRequest = {
-                    ...buildSearchRequest(appliedFilters),
-                    createdDateFrom: dateRange.from,
-                    createdDateTo: dateRange.to
-                };
-                const result = await searchBranches(
-                    searchRequest,
-                    { page: 0, size: Math.max(Number(payload.count ?? 0), 1) }
-                );
-                if (requestId === drilldownRequestId.current) {
-                    setDrilldownBranches(result.data?.content ?? []);
-                }
-            } catch (err) {
-                if (!isCancel(err)) setFailed(true);
-            } finally {
-                if (requestId === drilldownRequestId.current) setDrilldownLoading(false);
+            filters.status = value.toLowerCase() === "active";
+        } else if (drilldown.source === "organization") {
+            const org = optionsData.organizations.find(item => item.name === value || String(item.id) === value);
+            if (!org) {
+                setDrilldownBranches([]);
+                setDrilldownRowCount(0);
+                return;
             }
+            filters.organizationId = [org.id];
+        } else if (drilldown.source === "region") {
+            const region = optionsData.regions.find(item => item.name === value || String(item.id) === value);
+            if (!region) {
+                setDrilldownBranches([]);
+                setDrilldownRowCount(0);
+                return;
+            }
+            filters.regionId = [region.id];
+
+            if (drilldown.field === "active") filters.status = true;
+            else if (drilldown.field === "inactive") filters.status = false;
+        } else if (drilldown.source === "type") {
+            if (!value) {
+                setDrilldownBranches([]);
+                setDrilldownRowCount(0);
+                return;
+            }
+            filters.branchType = [value];
+        } else if (drilldown.source === "trends") {
+            const dateRange = getTrendDateRange(value);
+            if (!dateRange) {
+                setDrilldownBranches([]);
+                setDrilldownRowCount(0);
+                return;
+            }
+            filters.createdDateFrom = dateRange.from;
+            filters.createdDateTo = dateRange.to;
+        } else {
+            setDrilldownBranches([]);
+            setDrilldownRowCount(0);
             return;
         }
 
-        let list = [...allBranches];
-        if (payload.source === "status") {
-            const isAct = String(payload.value).toLowerCase() === "active";
-            list = list.filter(b => b.status === isAct);
-        } else if (payload.source === "organization") {
-            const org = optionsData.organizations.find(o => o.name === payload.value || String(o.id) === String(payload.value));
-            list = list.filter(b => org ? Number(b.organizationId) === Number(org.id) : String(b.organizationId) === String(payload.value));
-        } else if (payload.source === "region") {
-            const reg = optionsData.regions.find(r => r.name === payload.value || String(r.id) === String(payload.value));
-            if (reg) list = list.filter(b => Number(b.regionId) === Number(reg.id));
-            if (payload.field === "active") list = list.filter(b => b.status === true);
-            else if (payload.field === "inactive") list = list.filter(b => b.status === false);
-        } else if (payload.source === "type") {
-            list = list.filter(b => b.branchType === payload.value);
-        }
-        setDrilldownBranches(list);
-    }, [allBranches, optionsData, appliedFilters, buildSearchRequest]);
+        const sortableColumns = ["branchCode", "branchName", "branchType", "createdAt"];
+        const sortColumn = drilldownSorting[0];
+        const sort = sortColumn && sortableColumns.includes(sortColumn.id) ? `${sortColumn.id},${sortColumn.desc ? "desc" : "asc"}` : undefined;
+        setDrilldownError(false);
+        setDrilldownLoading(true);
 
+        searchBranches(filters, { page: drilldownPagination.pageIndex, size: drilldownPagination.pageSize, sort }, controller.signal)
+            .then(result => {
+                if (requestId !== drilldownRequestId.current) return;
+                setDrilldownBranches(result.data?.content ?? []);
+                setDrilldownRowCount(result.data?.totalElements ?? 0);
+            })
+            .catch(error => {
+                if (!isCancel(error) && requestId === drilldownRequestId.current) {
+                    setDrilldownError(true);
+                }
+            })
+            .finally(() => {
+                if (requestId === drilldownRequestId.current) {
+                    setDrilldownLoading(false);
+                }
+            });
+        return () => controller.abort();
+    }, [
+        drilldownOpen,
+        drilldown,
+        drilldownPagination,
+        drilldownSorting,
+        appliedFilters,
+        buildSearchRequest,
+        optionsData
+    ]);
     const handleExportDashboard = useCallback(async () => {
         const searchReq = buildSearchRequest(appliedFilters);
-        const hasFilter = Object.values(searchReq).some(v => v !== undefined);
         const controller = new AbortController();
-
         try {
             const fetchPromise = searchBranches(searchReq, { page: 0, size: totalFilteredCount }, controller.signal);
-
             const res = await fetchPromise;
             const list = res.data?.content ?? [];
             if (list.length === 0) return;
@@ -445,8 +503,8 @@ export default function BranchDashboard() {
                     ) : (
                         <Chip label="All Time Records" size="small" sx={{ fontWeight: 600, bgcolor: "#f1f5f9", color: "#334155" }} />
                     )}
-                    <Tooltip title="Refresh Dashboard Page">
-                        <IconButton size="small" onClick={() => window.location.reload()} sx={{ border: "1px solid #cbd5e1", bgcolor: "#fff", "&:hover": { bgcolor: "#f1f5f9" } }}>
+                    <Tooltip title="Refresh Dashboard Data">
+                        <IconButton size="small" onClick={handleRefresh} sx={{ border: "1px solid #cbd5e1", bgcolor: "#fff", "&:hover": { bgcolor: "#f1f5f9" } }}>
                             <RefreshIcon sx={{ fontSize: 20, color: "#17324d" }} />
                         </IconButton>
                     </Tooltip>
@@ -666,6 +724,11 @@ export default function BranchDashboard() {
                 </Box>
             ) : null}
             {/* Drilldown Records Dialog */}
+            {drilldownError && drilldownOpen && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    Failed to load branch records. Please try again.
+                </Alert>
+            )}
             <BranchDrilldownDialog
                 open={drilldownOpen}
                 onClose={() => setDrilldownOpen(false)}
@@ -675,6 +738,13 @@ export default function BranchDashboard() {
                 optionsData={optionsData}
                 users={users}
                 loading={drilldownLoading}
+                serverSide={{
+                    rowCount: drilldownRowCount,
+                    pagination: drilldownPagination,
+                    sorting: drilldownSorting,
+                    onPaginationChange: setDrilldownPagination,
+                    onSortingChange: setDrilldownSorting
+                }}
             />
         </>
     );

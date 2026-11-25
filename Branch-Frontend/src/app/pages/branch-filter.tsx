@@ -33,11 +33,20 @@ const gridStyle = { display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repe
 export default function SearchForm({ filters, setFilters, onApply, onReset, showMoreFilters, setShowMoreFilters, optionsData, renderChips, renderBelowFilters
 }: SearchFormProps) {
     const [errors, setErrors] = useState<Record<DateKey, string>>({ createdDateFrom: "", createdDateTo: "" });
+    const [draftSearch, setDraftSearch] = useState(filters.search);
+
     const set = (patch: Partial<BranchFilters>) => setFilters(prev => ({ ...prev, ...patch }));
     const setError = (field: DateKey, msg: string) => setErrors(prev => ({ ...prev, [field]: msg }));
     const fromDate = parseDate(filters.createdDateFrom);
     const toDate = parseDate(filters.createdDateTo);
     const dates: Record<DateKey, Dayjs | null> = { createdDateFrom: fromDate, createdDateTo: toDate };
+
+    // Single submit handler for Enter and Search icon
+    const onSearchSubmit = () => {
+        const trimmed = draftSearch.trim();
+        if (!trimmed) return; // Empty/whitespace → no API call
+        onApply({ ...filters, search: trimmed });
+    };
     const validateDate = (field: DateKey, date: Dayjs | null) => {
         if (!date) return "";
         if (!date.isValid()) return pickerErrors.invalidDate;
@@ -96,21 +105,24 @@ export default function SearchForm({ filters, setFilters, onApply, onReset, show
                                     label="Search Branch Code / Name"
                                     placeholder="Type branch code or select branch name..."
                                     options={[]}
-                                    value={filters.search}
+                                    value={draftSearch}
                                     disableSuggestions
-                                    inputValue={filters.search}
-                                    onInputChange={text => set({ search: text })}
+                                    inputValue={draftSearch}
+                                    onInputChange={text => setDraftSearch(text)}
                                     freeSolo
                                     disableClearable
                                     endAdornment={
                                         <Tooltip title="Search">
-                                            <IconButton size="small" onClick={() => onApply(filters)}>
+                                            <IconButton size="small" onClick={onSearchSubmit}>
                                                 <SearchIcon sx={{ color: "#fff", bgcolor: "#0f172a", width: 32, height: 32, borderRadius: "50%", p: 0.75 }} />
                                             </IconButton>
                                         </Tooltip>
                                     }
-                                    onChange={val => set({ search: val == null ? "" : Array.isArray(val) ? filters.search : typeof val === "object" ? val.name : String(val) })}
-                                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); onApply(filters); (e.target as HTMLElement).blur(); } }}
+                                    onChange={val => {
+                                        const text = val == null ? "" : Array.isArray(val) ? "" : typeof val === "object" ? (val as { name?: string }).name ?? "" : String(val);
+                                        setDraftSearch(text);
+                                    }}
+                                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); onSearchSubmit(); (e.target as HTMLElement).blur(); } }}
                                 />
                             </Box>
                             <Box sx={{ ...gridStyle, mb: 2.5 }}>
@@ -146,7 +158,7 @@ export default function SearchForm({ filters, setFilters, onApply, onReset, show
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1.5fr) minmax(0, 1fr)" }, gap: 2, mt: 1, mb: 2 }}>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}
                     justifyContent="center" alignItems={{ xs: "stretch", sm: "center" }}>
-                    <Button variant="contained" startIcon={<SearchIcon />} onClick={() => onApply(filters)} sx={{ bgcolor: "#17324d", "&:hover": { bgcolor: "#0f2032" } }}> Apply Filters </Button>
+                    <Button variant="contained" startIcon={<SearchIcon />} onClick={() => onApply({ ...filters, search: appliedFilters.search })} sx={{ bgcolor: "#17324d", "&:hover": { bgcolor: "#0f2032" } }}> Apply Filters </Button>
                     <Button variant="contained" startIcon={<FilterListIcon />} onClick={() => setShowMoreFilters(prev => !prev)}> {showMoreFilters ? "Less Filters" : "More Filters"} </Button>
                     <Button variant="contained" color="warning" startIcon={<ResetIcon />} onClick={onReset}> Reset </Button>
                 </Stack>

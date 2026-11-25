@@ -34,7 +34,7 @@ import { fetchBranches, setBranchLocally, removeBranchLocally } from "../../redu
 import { deleteBranch, getSession, getCounts, saveBranches, validateExcelFile, getBranchTemplate, getErrorMessage, getUserName } from "../branchApi";
 import type { Counts, DropdownOptions } from "../branchApi";
 import { fetchDropdownOptions, fetchUsers, selectFreshDropdownOptions, selectFreshUsers, invalidateAnalytics } from "../../redux/cacheSlice";
-import { parseIdList, viewCols } from "../branchUtils";
+import { parseIdList, viewCols, excelValue } from "../branchUtils";
 import type { Branch } from "../../types/BranchSchema";
 import BranchHeader from "../../components/Header";
 
@@ -89,14 +89,6 @@ const normalizeExcelRow = (row: ExcelRow, optionFields: OptionFields) => {
     }
     return { data, errors };
 };
-const excelValue = (key: string, value: unknown, optionFields: OptionFields) => {
-    if (value == null || value === "") return "";
-    const option = optionFields[key]?.find(item => Number(item.id) === Number(value));
-    if (option) return option.name;
-    if (key === "status") return value === true || String(value).toLowerCase() === "true" ? "Active" : "Inactive";
-    if (key === "departmentIds" || key === "serviceIds") return parseIdList(value).join(", ");
-    return String(value);
-};
 const errorField = (error: string) => error.split(":")[0].trim();
 const errorFields = (item: ImportRow) => new Set(item.errors.map(errorField));
 const mandatoryHeaders = new Set(["Branch Code", "Branch Name", "Organization", "Branch Type", "Region", "Country", "State", "City", "Address Line 1", "Status"]);
@@ -112,9 +104,10 @@ export default function BranchManagement() {
     const optionsReady = dropdownOptions !== null;
     const optionsData = dropdownOptions ?? emptyOptions;
     const optionFields = useMemo(() => getOptionFields(optionsData), [optionsData]);
-    const [counts, setCounts] = useState<Counts>({ total: 0, active: 0, inactive: 0 });
-    const [countsVersion, setCountsVersion] = useState(0);
+    const [globalCounts, setGlobalCounts] = useState<Counts>({ total: 0, active: 0, inactive: 0 });
+    const [dateCounts, setDateCounts] = useState<Counts>({ total: 0, active: 0, inactive: 0 });
     const [branchesVersion, setBranchesVersion] = useState(0);
+    const countsAbortRef = useRef<AbortController | null>(null);
     const [scope, setScope] = useState<Scope>("all");
     const [modes, setModes] = useState<Record<Scope, ModeState>>(() => {
         const all = defaults();
@@ -143,6 +136,7 @@ export default function BranchManagement() {
     const [invalidRows, setInvalidRows] = useState<ImportRow[]>([]);
     const [importFileName, setImportFileName] = useState("");
     const [savingExcel, setSavingExcel] = useState(false);
+    const [searchResetKey, setSearchResetKey] = useState(0);
     const resetPage = () => setPagination(p => p.pageIndex ? { ...p, pageIndex: 0 } : p);
     const statusFilter = applied.status.length === 1 ? applied.status[0] === "Active" : undefined;
     const selectedTile: Tile = statusFilter === undefined ? "total" : statusFilter ? "active" : "inactive";
@@ -169,22 +163,73 @@ export default function BranchManagement() {
         request.unwrap().catch(e => { if (e?.name !== "AbortError") void showError("Error!", "Failed to load branches."); });
         return () => request.abort();
     }, [dispatch, query]);
+    // Initial load — Both scopes load ONCE on mount
     useEffect(() => {
         const controller = new AbortController();
-        getCounts(dateRange, controller.signal).then(({ data }) => setCounts(data)).catch(() => { });
-        return () => controller.abort();
-    }, [dateRange, countsVersion]);
+        countsAbortRef.current = controller;
+
+        // Global (no dates) — for "Since Beginning"
+        getCounts({}, controller.signal).then(({ data }) => setGlobalCounts(data)).catch(() => {});
+
+        // Date-scoped — for "By Chosen Date" (uses initial applied dates)
+        const params = {
+            createdDateFrom: applied.createdDateFrom || undefined,
+            createdDateTo: applied.createdDateTo || undefined
+        };
+        getCounts(params, controller.signal).then(({ data }) => setDateCounts(data)).catch(() => {});
+
+        return () => { controller.abort(); countsAbortRef.current = null; };
+    }, []); // Mount ONLY
+
+    // afterChange — Refresh BOTH count sets on every mutation
     const afterChange = () => {
-        setCountsVersion(version => version + 1);
-        setBranchesVersion(version => version + 1);
+        if (countsAbortRef.current) countsAbortRef.current.abort();
+        const controller = new AbortController();
+        countsAbortRef.current = controller;
+
+        // Global counts (no dates) — for "Since Beginning"
+        getCounts({}, controller.signal).then(({ data }) => {
+            if (!controller.signal.aborted) setGlobalCounts(data);
+        }).catch(() => {});
+
+        // Date-scoped counts — for "By Chosen Date" (uses current applied dates)
+        const params = {
+            createdDateFrom: applied.createdDateFrom || undefined,
+            createdDateTo: applied.createdDateTo || undefined
+        };
+        getCounts(params, controller.signal).then(({ data }) => {
+            if (!controller.signal.aborted) setDateCounts(data);
+        }).catch(() => {});
+
+        setBranchesVersion(v => v + 1);
         dispatch(invalidateAnalytics());
         window.dispatchEvent(new Event("notifications-updated"));
     };
     const handleSaveSuccess = (saved: Branch[]) => { saved.filter(b => statusFilter === undefined || b.status === statusFilter).forEach(b => dispatch(setBranchLocally(b))); afterChange(); };
     const handleUpdateSuccess = (branch: Branch) => { dispatch(statusFilter !== undefined && branch.status !== statusFilter ? removeBranchLocally(branch.id) : setBranchLocally(branch)); afterChange(); };
-    const handleApplyFilters = () => {
-        if (same(filters, applied) && modes[scope].datesApplied) return;
-        patchMode({ applied: { ...filters }, datesApplied: true });
+    // Explicit date range apply — refresh date counts only
+    const applyDateRange = () => {
+        if (scope !== "date") return;
+        if (countsAbortRef.current) countsAbortRef.current.abort();
+        const controller = new AbortController();
+        countsAbortRef.current = controller;
+        const params = {
+            createdDateFrom: applied.createdDateFrom || undefined,
+            createdDateTo: applied.createdDateTo || undefined
+        };
+        getCounts(params, controller.signal).then(({ data }) => {
+            if (!controller.signal.aborted) setDateCounts(data);
+        }).catch(() => {});
+    };
+
+const handleApplyFilters = (nextFilters?: BranchFilters) => {
+        const target = nextFilters ? { ...nextFilters } : { ...filters };
+        const trimmedSearch = target.search?.trim() || "";
+        const targetWithTrimmed = { ...target, search: trimmedSearch };
+
+        if (same(targetWithTrimmed, applied) && modes[scope].datesApplied) return;
+        patchMode({ applied: { ...targetWithTrimmed }, datesApplied: true });
+        if (scope === "date") applyDateRange(); // Explicit date count refresh
         resetPage();
     };
     const handleResetFilters = () => {
@@ -192,9 +237,10 @@ export default function BranchManagement() {
         const a = { ...f };
         if (scope === "all") { a.createdDateFrom = ""; a.createdDateTo = ""; }
         patchMode({ filters: f, applied: a, datesApplied: scope === "date" });
+        setSearchResetKey(k => k + 1);
         resetPage();
     };
-    const switchScope = (next: Scope) => { if (next === scope) return; setScope(next); resetPage(); };
+    const switchScope = (next: Scope) => { if (next === scope) return; setScope(next); resetPage(); }; // NO counts call
     const pickStatus = (id: Tile) => {
         const status = id === "total" ? [] : [id === "active" ? "Active" : "Inactive"];
         patchMode({ filters: { ...filters, status }, ...(same(status, applied.status) ? {} : { applied: { ...applied, status } }) });
@@ -223,10 +269,14 @@ export default function BranchManagement() {
     const removeChip = (chip: FilterChip) => {
         if (chip.key === "createdDateFrom" || chip.key === "createdDateTo") return;
         const next: BranchFilters = { ...filters };
-        if (chip.key === "search") next.search = "";
-        else (next[chip.key] as (string | number)[]) = (next[chip.key] as (string | number)[]).filter(v => String(v) !== String(chip.value));
-        patchMode({ filters: next, ...(same(next, applied) ? {} : { applied: { ...next } }) });
-        resetPage();
+        if (chip.key === "search") {
+            next.search = "";
+            setSearchResetKey(k => k + 1);
+        } else {
+            (next[chip.key] as (string | number)[]) = (next[chip.key] as (string | number)[]).filter(v => String(v) !== String(chip.value));
+        }
+        // Apply with the updated filters to clear applied search
+        handleApplyFilters(next);
     };
     // ----------------------- Excel upload and validation -----------------------
     const formatBranchWorkbook = (workbook: WorkBook) => {
@@ -392,7 +442,7 @@ export default function BranchManagement() {
         downloadExcel(rows, headers, "invalid-branches.xlsx", "Invalid Rows");
     };
     const downloadAllBranches = () => {
-        const rows = branches.map(branch => Object.fromEntries(viewCols.map(([label, key]) => [label, excelValue(key, branch[key as keyof Branch], optionFields)])));
+        const rows = branches.map(branch => Object.fromEntries(viewCols.map(([label, key]) => [label, excelValue(key, branch[key as keyof Branch], optionFields, users)])));
         downloadExcel(rows, viewCols.map(([label]) => label), "branches.xlsx", "Branches");
     };
     const columns: MRT_ColumnDef<Branch>[] = [
@@ -423,10 +473,12 @@ export default function BranchManagement() {
         { accessorKey: "updatedAt", header: "Updated At", size: 200 }
     ].map(column => ({ ...column, enableSorting: column.enableSorting ?? false, muiTableHeadCellProps: headProps, muiTableBodyCellProps: bodyProps }));
 
+    // Tiles use scope-appropriate counts
+    const displayCounts = scope === "all" ? globalCounts : dateCounts;
     const tiles = [
-        { id: "total" as const, label: "Total Branches", count: counts.total, classType: "stat-card-total", icon: <StorageIcon /> },
-        { id: "active" as const, label: "Active", count: counts.active, classType: "stat-card-active", icon: <CheckCircleIcon /> },
-        { id: "inactive" as const, label: "Inactive", count: counts.inactive, classType: "stat-card-inactive", icon: <CancelIcon /> }
+        { id: "total" as const, label: "Total Branches", count: displayCounts.total, classType: "stat-card-total", icon: <StorageIcon /> },
+        { id: "active" as const, label: "Active", count: displayCounts.active, classType: "stat-card-active", icon: <CheckCircleIcon /> },
+        { id: "inactive" as const, label: "Inactive", count: displayCounts.inactive, classType: "stat-card-inactive", icon: <CancelIcon /> }
     ];
     const rowActions = (branch: Branch) => {
         const actions: { title: string; color: "info" | "primary" | "error"; icon: ReactNode; run: () => void }[] = [
@@ -459,7 +511,7 @@ export default function BranchManagement() {
                 </Stack>
             </Card>
             <div className="dashboard-top-grid">
-                <SearchForm filters={filters} appliedFilters={applied} setFilters={setFilters} onApply={handleApplyFilters} onReset={handleResetFilters} showMoreFilters={showMoreFilters} setShowMoreFilters={setShowMoreFilters} optionsData={optionsData}
+                <SearchForm key={searchResetKey} filters={filters} appliedFilters={applied} setFilters={setFilters} onApply={handleApplyFilters} onReset={handleResetFilters} showMoreFilters={showMoreFilters} setShowMoreFilters={setShowMoreFilters} optionsData={optionsData}
                     renderChips={chips => (
                         <Paper elevation={0} sx={{ mt: 2, p: 1.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 2 }} >
                             <Stack direction="row" alignItems="center" spacing={2}>

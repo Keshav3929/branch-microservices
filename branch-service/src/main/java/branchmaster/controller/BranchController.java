@@ -65,8 +65,8 @@ public class BranchController {
     }
 
     @GetMapping("branch/analytics")
-    public BranchAnalyticsDto getAnalytics() {
-        return branchService.getAnalytics();
+    public BranchAnalyticsDto getAnalytics(BranchSearchRequestDto filters) {
+        return branchService.getAnalytics(filters);
     }
 
     @GetMapping("branch/creation-trends")

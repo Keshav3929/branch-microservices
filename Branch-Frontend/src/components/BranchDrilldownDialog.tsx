@@ -8,7 +8,7 @@ import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import type { MRT_ColumnDef, MRT_Row } from "material-react-table";
-import DataTable from "./Table";
+import DataTable, { type ServerSideProps } from "./Table";
 import BranchHistoryDialog from "../app/pages/branch-history";
 import type { Branch } from "../types/BranchSchema";
 import type { DropdownOptions, UserOption } from "../app/branchApi";
@@ -24,6 +24,7 @@ export type BranchDrilldownDialogProps = {
     optionsData: DropdownOptions;
     users: UserOption[];
     loading?: boolean;
+    serverSide: ServerSideProps;
 };
 
 const headProps = { sx: { backgroundColor: "#17324d", color: "#fff", textAlign: "center", "& .Mui-TableHeadCell-Content": { justifyContent: "center" }, "& .MuiTableSortLabel-root, & .MuiTableSortLabel-icon": { color: "#fff !important" } } };
@@ -44,7 +45,8 @@ export default function BranchDrilldownDialog({
     branches,
     optionsData,
     users,
-    loading = false
+    loading = false,
+    serverSide
 }: BranchDrilldownDialogProps) {
     const [viewBranch, setViewBranch] = useState<Branch | null>(null);
 
@@ -115,7 +117,12 @@ export default function BranchDrilldownDialog({
                     <Box>
                         <Stack direction="row" spacing={1.5} alignItems="center">
                             <Typography variant="h6" fontWeight={800} color="#0f172a"> {title} </Typography>
-                            <Chip label={`${branches.length} ${branches.length === 1 ? "Record" : "Records"}`} size="small" color="primary" sx={{ fontWeight: 700, borderRadius: 1.5 }} />
+                            <Chip
+                                label={`${serverSide.rowCount} ${serverSide.rowCount === 1 ? "Record" : "Records"}`}
+                                size="small"
+                                color="primary"
+                                sx={{ fontWeight: 700, borderRadius: 1.5 }}
+                            />
                         </Stack>
                         {subtitle && (
                             <Typography variant="body2" color="text.secondary"> {subtitle} </Typography>
@@ -128,7 +135,14 @@ export default function BranchDrilldownDialog({
                 </DialogTitle>
 
                 <DialogContent sx={{ p: 1.5, flex: 1, overflow: "auto" }}>
-                    <DataTable data={branches} columns={columns} loading={loading} maxHeight={520} emptyMessage="No branch records found for this selection." />
+                    <DataTable
+                        data={branches}
+                        columns={columns}
+                        loading={loading}
+                        maxHeight={520}
+                        emptyMessage="No branch records found for this selection."
+                        serverSide={serverSide}
+                    />
                 </DialogContent>
                 <DialogActions sx={{ px: 2, py: 1.5, borderTop: "1px solid #e2e8f0" }}>
                     <Button variant="contained" onClick={onClose} sx={{ bgcolor: "#17324d", "&:hover": { bgcolor: "#0f2032" } }}> Close </Button>

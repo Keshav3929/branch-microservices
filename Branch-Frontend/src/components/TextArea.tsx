@@ -10,9 +10,10 @@ interface TextAreaProps {
     error?: boolean;
     helperText?: string;
     rows?: number;
+    size?: "small" | "medium";
 }
 
-function TextArea({ label, name, value, onChange, onBlur, error = false, helperText, rows = 3 }: TextAreaProps) {
+function TextArea({ label, name, value, onChange, onBlur, error = false, helperText, rows = 3, size = "small" }: TextAreaProps) {
     return (
         <MuiTextField
             fullWidth
@@ -26,6 +27,7 @@ function TextArea({ label, name, value, onChange, onBlur, error = false, helperT
             onBlur={onBlur}
             error={error}
             helperText={helperText}
+            size={size}
         />
     );
 }

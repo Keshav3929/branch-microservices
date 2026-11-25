@@ -10,9 +10,10 @@ interface TextFieldProps {
     onBlur?: (event: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
     error?: boolean;
     helperText?: string;
+    size?: "small" | "medium";
 }
 
-function TextField({ label, name, value, type, onChange, onBlur, error = false, helperText }: TextFieldProps) {
+function TextField({ label, name, value, type, onChange, onBlur, error = false, helperText, size = "small" }: TextFieldProps) {
     return (
         <MuiTextField
             fullWidth
@@ -25,6 +26,7 @@ function TextField({ label, name, value, type, onChange, onBlur, error = false, 
             onBlur={onBlur}
             error={error}
             helperText={helperText}
+            size={size}
         />
     );
 }

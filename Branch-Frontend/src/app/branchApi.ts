@@ -101,8 +101,13 @@ export const parseApiError = (err: unknown) => {
 };
 export const getErrorMessage = (err: unknown, fallback: string) => parseApiError(err).message ?? fallback;
 
-export const getAnalytics = (signal?: AbortSignal) =>
-    axios.get<BranchAnalytics>("branch/analytics", { signal });
+export const getAnalytics = (
+    filters?: BranchSearchRequest,
+    signal?: AbortSignal
+) => axios.get<BranchAnalytics>("branch/analytics", {
+    params: filters,
+    signal
+});
 
 export const getCreationTrends = (
     granularity: CreationGranularity,
