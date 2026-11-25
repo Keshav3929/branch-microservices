@@ -11,8 +11,8 @@ import branchmaster.dto.CreationTrendsDto;
 import branchmaster.dto.DropdownOptionsDto;
 import branchmaster.entity.Branch;
 import branchmaster.exception.BranchException;
-import branchmaster.repository.BranchRepository;
 import branchmaster.repository.BranchAnalyticsRepository;
+import branchmaster.repository.BranchRepository;
 import branchmaster.repository.BranchSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 
 import java.time.LocalDate;
@@ -43,7 +42,6 @@ public class BranchService {
     private final EmailNotificationService emailNotificationService;
     private final NotificationService notificationService;
     private final DropdownClient dropdownClient;
-    private final BranchAnalyticsRepository branchAnalyticsRepository;
 
     private Branch getBranch(Long id) {
         return branchRepository.findById(id).orElseThrow(() -> new BranchException(BranchException.Type.NOT_FOUND));
@@ -76,7 +74,6 @@ public class BranchService {
             throw new BranchException(BranchException.Type.INVALID_DATE_RANGE);
         }
 
-        Boolean status = filters.getStatus();
         String normalizedGranularity = granularity == null
                 ? ""
                 : granularity.trim().toLowerCase(Locale.ROOT);
@@ -85,16 +82,11 @@ public class BranchService {
             throw new BranchException(BranchException.Type.INVALID_GRANULARITY);
         }
 
-        List<BranchAnalyticsRepository.CreationData> results =
-                branchAnalyticsRepository.getCreationTrends(filters, normalizedGranularity);
+        List<BranchAnalyticsRepository.CreationData> results = branchRepository.getCreationTrends(filters, normalizedGranularity);
 
         List<CreationTrendsDto.TrendPoint> trends = results.stream()
-                .map(row -> new CreationTrendsDto.TrendPoint(
-                        row.date(),
-                        row.count()
-                ))
-                .toList();
-        return new CreationTrendsDto(granularity, trends);
+                .map(row -> new CreationTrendsDto.TrendPoint(row.date(), row.count())).toList();
+        return new CreationTrendsDto(normalizedGranularity, trends);
     }
 
     private void notifyChange(Branch saved, String operation) {
@@ -176,7 +168,7 @@ public class BranchService {
     }
 
     public BranchAnalyticsDto getAnalytics(BranchSearchRequestDto filters) {
-        var data = branchAnalyticsRepository.getAnalytics(filters);
+        var data = branchRepository.getAnalytics(filters);
         var locations = dropdownClient.getLocations();
         var organizationsData = dropdownClient.getOrganizations();
         var regionNames = locations.regions().stream().collect(Collectors.toMap(DropdownOptionsDto.DropdownOptionDto::id, DropdownOptionsDto.DropdownOptionDto::name));
