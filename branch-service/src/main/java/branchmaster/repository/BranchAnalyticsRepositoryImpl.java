@@ -51,41 +51,22 @@ public class BranchAnalyticsRepositoryImpl implements BranchAnalyticsRepository 
         var date = root.get("createdAt");
 
         var period = switch (granularity.toLowerCase(java.util.Locale.ROOT)) {
-            case "yearly" -> cb.function("DATE_FORMAT", String.class,
-                    date, cb.literal("%Y"));
-            case "monthly" -> cb.function("DATE_FORMAT", String.class,
-                    date, cb.literal("%Y-%m"));
+            case "yearly" -> cb.function("DATE_FORMAT", String.class, date, cb.literal("%Y"));
+            case "monthly" -> cb.function("DATE_FORMAT", String.class, date, cb.literal("%Y-%m"));
             case "weekly" -> cb.concat(
                     cb.function("DATE_FORMAT", String.class, date, cb.literal("%x")),
-                    cb.concat("-W",
-                            cb.function("DATE_FORMAT", String.class, date, cb.literal("%v")))
+                    cb.concat("-W", cb.function("DATE_FORMAT", String.class, date, cb.literal("%v")))
             );
-            case "daily" -> cb.function("DATE_FORMAT", String.class,
-                    date, cb.literal("%Y-%m-%d"));
+            case "daily" -> cb.function("DATE_FORMAT", String.class, date, cb.literal("%Y-%m-%d"));
             default -> throw new IllegalArgumentException("Invalid granularity: " + granularity);
         };
-
-        query.select(cb.tuple(
-                period.alias("date"),
-                cb.count(root).alias("count")
-        ));
-
-        query.where(
-                cb.and(
-                        getPredicate(filters, root, query, cb),
-                        cb.isNotNull(date)
-                )
-        );
-
+        query.select(cb.tuple(period.alias("date"), cb.count(root).alias("count")));
+        query.where(cb.and(getPredicate(filters, root, query, cb), cb.isNotNull(date)));
         query.groupBy(period);
         query.orderBy(cb.asc(period));
 
         return entityManager.createQuery(query).getResultList().stream()
-                .map(row -> new CreationData(
-                        row.get("date", String.class),
-                        row.get("count", Long.class)
-                ))
-                .toList();
+                .map(row -> new CreationData(row.get("date", String.class), row.get("count", Long.class))).toList();
     }
 
     private List<CreationData> getCreationTrends(BranchSearchRequestDto filters) {
@@ -102,21 +83,18 @@ public class BranchAnalyticsRepositoryImpl implements BranchAnalyticsRepository 
                         cb.coalesce(
                                 cb.sum(cb.<Long>selectCase()
                                         .when(cb.isTrue(root.get("status")), 1L)
-                                        .otherwise(0L)),
-                                0L
+                                        .otherwise(0L)), 0L
                         ).alias("active"),
 
                         cb.coalesce(
                                 cb.sum(cb.<Long>selectCase()
                                         .when(cb.isFalse(root.get("status")), 1L)
-                                        .otherwise(0L)),
-                                0L
+                                        .otherwise(0L)), 0L
                         ).alias("inactive")
                 )
         );
 
         query.where(getPredicate(filters, root, query, cb));
-
         Tuple result = entityManager.createQuery(query).getSingleResult();
 
         return new long[]{
@@ -150,8 +128,7 @@ public class BranchAnalyticsRepositoryImpl implements BranchAnalyticsRepository 
                         row.get("regionId", Long.class),
                         row.get("active", Long.class),
                         row.get("inactive", Long.class)
-                ))
-                .toList();
+                )).toList();
     }
 
     private List<TypeData> getTypes(BranchSearchRequestDto filters) {
@@ -159,21 +136,12 @@ public class BranchAnalyticsRepositoryImpl implements BranchAnalyticsRepository 
         CriteriaQuery<Tuple> query = cb.createTupleQuery();
         Root<Branch> root = query.from(Branch.class);
 
-        query.select(cb.tuple(
-                        root.get("branchType").alias("branchType"),
-                        cb.count(root).alias("count")
-                )
-        );
-
+        query.select(cb.tuple(root.get("branchType").alias("branchType"), cb.count(root).alias("count")));
         query.where(getPredicate(filters, root, query, cb));
         query.groupBy(root.get("branchType"));
 
         return entityManager.createQuery(query).getResultList().stream()
-                .map(row -> new TypeData(
-                        row.get("branchType", String.class),
-                        row.get("count", Long.class)
-                ))
-                .toList();
+                .map(row -> new TypeData(row.get("branchType", String.class), row.get("count", Long.class))).toList();
     }
 
     private List<OrganizationData> getOrganizations(BranchSearchRequestDto filters) {
@@ -191,11 +159,7 @@ public class BranchAnalyticsRepositoryImpl implements BranchAnalyticsRepository 
         query.groupBy(root.get("organizationId"));
 
         return entityManager.createQuery(query).getResultList().stream()
-                .map(row -> new OrganizationData(
-                        row.get("organizationId", Long.class),
-                        row.get("count", Long.class)
-                ))
-                .toList();
+                .map(row -> new OrganizationData(row.get("organizationId", Long.class), row.get("count", Long.class))).toList();
     }
 
     private Predicate getPredicate(
@@ -204,13 +168,6 @@ public class BranchAnalyticsRepositoryImpl implements BranchAnalyticsRepository 
             CriteriaQuery<?> query,
             CriteriaBuilder cb
     ) {
-        Predicate specification = BranchSpecification.search(filters)
-                .toPredicate(root, query, cb);
-
-        Predicate notDeleted = cb.isFalse(root.get("isDeleted"));
-
-        return specification == null
-                ? notDeleted
-                : cb.and(specification, notDeleted);
+        return BranchSpecification.search(filters).toPredicate(root, query, cb);
     }
 }

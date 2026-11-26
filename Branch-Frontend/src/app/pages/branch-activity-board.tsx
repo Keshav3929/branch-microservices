@@ -168,18 +168,33 @@ export default function BranchManagement() {
         const controller = new AbortController();
         countsAbortRef.current = controller;
 
-        // Global (no dates) — for "Since Beginning"
-        getCounts({}, controller.signal).then(({ data }) => setGlobalCounts(data)).catch(() => {});
-
-        // Date-scoped — for "By Chosen Date" (uses initial applied dates)
         const params = {
             createdDateFrom: applied.createdDateFrom || undefined,
             createdDateTo: applied.createdDateTo || undefined
         };
-        getCounts(params, controller.signal).then(({ data }) => setDateCounts(data)).catch(() => {});
 
-        return () => { controller.abort(); countsAbortRef.current = null; };
-    }, []); // Mount ONLY
+        // Fetch global counts once.
+        getCounts({}, controller.signal)
+            .then(({ data }) => {
+                if (controller.signal.aborted) return;
+                setGlobalCounts(data);
+                // No date selected: both count sets are identical.
+                if (!params.createdDateFrom && !params.createdDateTo) {
+                    setDateCounts(data);
+                }
+            })
+            .catch(() => { });
+        // Fetch separate date-scoped counts only when a date is selected.
+        if (params.createdDateFrom || params.createdDateTo) {
+            getCounts(params, controller.signal)
+                .then(({ data }) => { if (!controller.signal.aborted) setDateCounts(data); })
+                .catch(() => { });
+        }
+        return () => {
+            controller.abort();
+            countsAbortRef.current = null;
+        };
+    }, [applied.createdDateFrom, applied.createdDateTo]);
 
     // afterChange — Refresh BOTH count sets on every mutation
     const afterChange = () => {
@@ -190,7 +205,7 @@ export default function BranchManagement() {
         // Global counts (no dates) — for "Since Beginning"
         getCounts({}, controller.signal).then(({ data }) => {
             if (!controller.signal.aborted) setGlobalCounts(data);
-        }).catch(() => {});
+        }).catch(() => { });
 
         // Date-scoped counts — for "By Chosen Date" (uses current applied dates)
         const params = {
@@ -199,7 +214,7 @@ export default function BranchManagement() {
         };
         getCounts(params, controller.signal).then(({ data }) => {
             if (!controller.signal.aborted) setDateCounts(data);
-        }).catch(() => {});
+        }).catch(() => { });
 
         setBranchesVersion(v => v + 1);
         dispatch(invalidateAnalytics());
@@ -219,10 +234,10 @@ export default function BranchManagement() {
         };
         getCounts(params, controller.signal).then(({ data }) => {
             if (!controller.signal.aborted) setDateCounts(data);
-        }).catch(() => {});
+        }).catch(() => { });
     };
 
-const handleApplyFilters = (nextFilters?: BranchFilters) => {
+    const handleApplyFilters = (nextFilters?: BranchFilters) => {
         const target = nextFilters ? { ...nextFilters } : { ...filters };
         const trimmedSearch = target.search?.trim() || "";
         const targetWithTrimmed = { ...target, search: trimmedSearch };

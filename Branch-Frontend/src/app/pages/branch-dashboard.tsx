@@ -17,7 +17,7 @@ import DashboardStatTiles from "../../components/DashboardStatTiles";
 import DashboardFilterBar from "./dashboard-filter";
 import BranchDrilldownDialog from "../../components/BranchDrilldownDialog";
 import { getFilterChips, exportBranchExcel } from "../branchUtils";
-import { searchBranches, getAnalytics, getCreationTrends } from "../branchApi";
+import { searchBranches, getAnalytics, getCreationTrends, getCounts } from "../branchApi";
 import type { BranchAnalytics, DropdownOptions, BranchSearchRequest, CreationTrendsResponse } from "../branchApi";
 import type { Branch } from "../../types/BranchSchema";
 import type { ChartEngine, TableBreakdownRow, DrilldownPayload } from "../../types/chartTypes";
@@ -82,7 +82,7 @@ export default function BranchDashboard() {
     const dispatch = useDispatch<AppDispatch>();
     const [engine, setEngine] = useState<ChartEngine>("recharts");
     const [analytics, setAnalytics] = useState<BranchAnalytics | null>(null);
-    const [overallAnalytics, setOverallAnalytics] = useState<BranchAnalytics | null>(null);
+    const [globalCounts, setGlobalCounts] = useState({ total: 0, active: 0, inactive: 0 });
     const [totalFilteredCount, setTotalFilteredCount] = useState<number>(0);
     const [loading, setLoading] = useState(true);
     const [failed, setFailed] = useState(false);
@@ -179,12 +179,16 @@ export default function BranchDashboard() {
         setFailed(false);
         setLoading(true);
 
-        getAnalytics(searchReq, controller.signal)
-            .then(res => {
+        Promise.all([
+            getAnalytics(searchReq, controller.signal),
+            getCounts({}, controller.signal)
+        ])
+            .then(([analyticsRes, countsRes]) => {
                 if (controller.signal.aborted) return;
-                setAnalytics(res.data);
-                setOverallAnalytics(res.data);
-                setTotalFilteredCount(res.data.total);
+
+                setAnalytics(analyticsRes.data);
+                setTotalFilteredCount(analyticsRes.data.total);
+                setGlobalCounts(countsRes.data);
             })
             .catch(err => {
                 if (!isCancel(err) && !controller.signal.aborted) {
@@ -198,7 +202,6 @@ export default function BranchDashboard() {
             });
 
         trendAbortRef.current?.abort();
-
         const trendController = new AbortController();
         trendAbortRef.current = trendController;
 
@@ -221,17 +224,19 @@ export default function BranchDashboard() {
         const controller = new AbortController();
         const loadDashboard = async () => {
             try {
-                const [, , analyticsResult] = await Promise.all([
+                const [, , analyticsResult, countsResult] = await Promise.all([
                     dispatch(fetchDropdownOptions()).unwrap(),
                     dispatch(fetchUsers()).unwrap(),
                     getAnalytics(buildSearchRequest(appliedFilters), controller.signal),
+                    getCounts({}, controller.signal)
                 ]);
 
                 if (controller.signal.aborted) return;
 
-                setOverallAnalytics(analyticsResult.data);
+
                 setAnalytics(analyticsResult.data);
                 setTotalFilteredCount(analyticsResult.data.total);
+                setGlobalCounts(countsResult.data);
 
                 initialLoadComplete.current = true;
             } catch (err) {
@@ -246,7 +251,7 @@ export default function BranchDashboard() {
         loadDashboard();
 
         return () => controller.abort();
-    }, [dispatch]);
+    }, [dispatch, appliedFilters, buildSearchRequest]);
     // Filter change effect
     useEffect(() => {
         if (!initialLoadComplete.current) return;
@@ -264,7 +269,6 @@ export default function BranchDashboard() {
             .then(res => {
                 if (controller.signal.aborted) return;
                 setAnalytics(res.data);
-                setOverallAnalytics(res.data);
                 setTotalFilteredCount(res.data.total);
             })
             .catch(err => {
@@ -520,9 +524,9 @@ export default function BranchDashboard() {
 
             {/* KPI Stat Tiles */}
             <DashboardStatTiles
-                total={overallAnalytics?.total ?? 0}
-                active={overallAnalytics?.active ?? 0}
-                inactive={overallAnalytics?.inactive ?? 0}
+                total={globalCounts.total}
+                active={globalCounts.active}
+                inactive={globalCounts.inactive}
                 activeStatusFilter={activeTileStatus}
                 onTileClick={handleTileClick}
             />

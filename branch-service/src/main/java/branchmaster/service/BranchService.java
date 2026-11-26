@@ -168,7 +168,7 @@ public class BranchService {
     }
 
     public BranchAnalyticsDto getAnalytics(BranchSearchRequestDto filters) {
-        var data = branchRepository.getAnalytics(filters);
+        var data = branchRepository.getAnalytics(new BranchSearchRequestDto());
         var locations = dropdownClient.getLocations();
         var organizationsData = dropdownClient.getOrganizations();
         var regionNames = locations.regions().stream().collect(Collectors.toMap(DropdownOptionsDto.DropdownOptionDto::id, DropdownOptionsDto.DropdownOptionDto::name));
