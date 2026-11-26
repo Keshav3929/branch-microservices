@@ -1,5 +1,6 @@
-import type { ReactNode, KeyboardEvent } from "react";
+import type { ReactNode, KeyboardEvent, ChangeEvent } from "react";
 import { Autocomplete as MuiAutocomplete, TextField as MuiTextField, Chip } from "@mui/material";
+import { useState, useEffect, useMemo } from "react";
 
 export type AutoCompleteOption = { id: number | string; name: string } | string | number;
 export type AutoCompleteValue = AutoCompleteOption | AutoCompleteOption[] | null;
@@ -24,14 +25,24 @@ interface MultiSelectAutoCompleteProps {
     inputValue?: string;
     onInputChange?: (value: string) => void;
     onKeyDown?: (event: KeyboardEvent) => void;
+    allOption?: string;
+    allOptionValues?: string[];            
 }
 
 export default function MultiSelectAutoComplete({
     label, options, value, onChange, multiple = false, freeSolo = false,
     disableClearable = false, disableSuggestions = false, error = false,
     helperText, fullWidth = true, size = "small", placeholder, endAdornment,
-    inputValue, onInputChange, onKeyDown, onFocus, onBlur
+    inputValue, onInputChange, onKeyDown, onFocus, onBlur,
+    allOption, allOptionValues
 }: MultiSelectAutoCompleteProps) {
+    const [internalValue, setInternalValue] = useState<AutoCompleteValue>(value);
+
+    // Sync internal value with props
+    useEffect(() => {
+        setInternalValue(value);
+    }, [value]);
+
     const getOptionLabel = (option: AutoCompleteOption) =>
         typeof option === "object" ? option.name : String(option);
 
@@ -44,11 +55,64 @@ export default function MultiSelectAutoComplete({
     const selectedValue = (item: AutoCompleteOption | null) =>
         item == null ? null : options.find(option => isOptionEqualToValue(option, item)) ?? item;
 
-    const normalizedValue = multiple
-        ? (Array.isArray(value) ? value : value == null ? [] : [value])
+    const normalizedValue = useMemo(() => {
+        if (!multiple) {
+            return selectedValue(Array.isArray(value) ? value[0] ?? null : value);
+        }
+        return (Array.isArray(value) ? value : value == null ? [] : [value])
             .map(item => selectedValue(item as AutoCompleteOption))
-            .filter((item): item is AutoCompleteOption => item !== null)
-        : selectedValue(Array.isArray(value) ? value[0] ?? null : value);
+            .filter((item): item is AutoCompleteOption => item !== null);
+    }, [value, multiple, options]);
+
+    const handleChange = (event: React.SyntheticEvent, newValue: AutoCompleteValue) => {
+        if (!multiple || !allOption || !allOptionValues || allOptionValues.length === 0) {
+            onChange(newValue as AutoCompleteValue);
+            return;
+        }
+
+        const newArray = Array.isArray(newValue) ? newValue : newValue == null ? [] : [newValue];
+        const newStrings = newArray.map(getOptionLabel);
+        const hasAll = newStrings.includes(allOption);
+        const prevHasAll = allOptionValues.every(v => normalizedValue && (Array.isArray(normalizedValue) ? normalizedValue : []).map(getOptionLabel).includes(v));
+
+        let resultStrings: string[];
+
+        if (hasAll && !prevHasAll) {
+            resultStrings = allOptionValues;
+        } else if (!hasAll && prevHasAll) {
+            resultStrings = [];
+        } else {
+            const allIndividualSelected = allOptionValues.every(v => newStrings.includes(v));
+            if (allIndividualSelected) {
+                resultStrings = [...allOptionValues, allOption];
+            } else {
+                resultStrings = newStrings.filter(v => v !== allOption);
+            }
+        }
+
+        onChange(resultStrings as AutoCompleteValue);
+    };
+
+    const showAllSelected = multiple && allOption && allOptionValues && allOptionValues.length > 0
+        ? allOptionValues.every(v => {
+            const valArray = Array.isArray(normalizedValue) ? normalizedValue : [];
+            return valArray.map(getOptionLabel).includes(v);
+        })
+        : false;
+
+    const displayValue = useMemo(() => {
+        if (!multiple || !allOption || !allOptionValues) {
+            return normalizedValue;
+        }
+        if (showAllSelected) {
+            const baseArray = Array.isArray(normalizedValue) ? normalizedValue : [];
+            const hasAllInValue = baseArray.map(getOptionLabel).includes(allOption);
+            if (!hasAllInValue) {
+                return [...baseArray, allOption];
+            }
+        }
+        return normalizedValue;
+    }, [normalizedValue, multiple, allOption, allOptionValues, showAllSelected]);
 
     return (
         <MuiAutocomplete
@@ -62,20 +126,25 @@ export default function MultiSelectAutoComplete({
             options={options}
             getOptionLabel={getOptionLabel}
             isOptionEqualToValue={isOptionEqualToValue}
-            value={normalizedValue as never}
-            onChange={(_, newValue) => onChange(newValue as AutoCompleteValue)}
+            value={displayValue as never}
+            onChange={handleChange}
             inputValue={inputValue}
             onInputChange={onInputChange ? (_, val) => onInputChange(val) : undefined}
             filterOptions={disableSuggestions ? options => options : undefined}
             renderValue={multiple ? (selected, getItemProps) =>
-                (Array.isArray(selected) ? selected : [selected]).map((option, index) => (
-                    <Chip {...getItemProps({ index })} key={index}
-                        label={getOptionLabel(option)} size="small" />
-                )) : undefined}
+                (Array.isArray(selected) ? selected : [selected]).map((option, index) => {
+                    const optLabel = getOptionLabel(option);
+                    if (optLabel === allOption) return null;
+                    return (
+                        <Chip {...getItemProps({ index })} key={index}
+                            label={optLabel} size="small" />
+                    );
+                }) : undefined}
             renderInput={params => (
                 <MuiTextField
                     {...params}
                     size={size}
+                    margin="dense"
                     label={label}
                     placeholder={placeholder}
                     error={error}

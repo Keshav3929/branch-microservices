@@ -16,7 +16,8 @@ import { splitCsv, joinCsv, pickId, gridStyle, type OptionItem, type OptionsData
 type Kind = "text" | "num" | "str" | "pick" | "multi" | "status";
 type Field = readonly [kind: Kind, key: string, label: string, source?: keyof OptionsData | string[]];
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const DAYS = ["All", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const WORKING_DAYS_ONLY = DAYS.slice(1); // ["Monday", ..., "Sunday"] - without "All"
 const SECTIONS: { title: string; sub: string; icon: ReactNode; pre?: Field; fields: Field[] }[] = [
     {
         title: "General Details", sub: "Branch identity and organization", icon: <BusinessIcon />, fields: [
@@ -36,8 +37,8 @@ const SECTIONS: { title: string; sub: string; icon: ReactNode; pre?: Field; fiel
             ["text", "telephone", "Telephone"], ["text", "email", "Email"]]
     },
     {
-        title: "Operations & Services", sub: "Working schedule, departments and status", icon: <SettingsIcon />,
-        pre: ["multi", "workingDays", "Select Working Days", DAYS], fields: [
+        title: "Operations & Services", sub: "Working schedule, departments and status", icon: <SettingsIcon />, fields: [
+            ["multi", "workingDays", "Working Days", DAYS],
             ["str", "workingHoursId", "Working Hours", "workingHours"],
             ["multi", "departmentIds", "Departments", ["HR", "Finance", "IT", "Sales"]],
             ["multi", "serviceIds", "Services", ["OPD", "Emergency", "Pharmacy", "Laboratory"]],
@@ -92,7 +93,9 @@ export default function BranchFormFields({ data, set, errOf, onBlur, optionsData
                     value={(v as string) || null} onChange={x => set({ [key]: typeof x === "string" ? x : "" })} />;
             case "multi":
                 return <MultiSelectAutoComplete key={key} {...common} multiple options={list as string[]}
-                    value={splitCsv(v as string)} onChange={x => set({ [key]: joinCsv(x) })} />;
+                    value={splitCsv(v as string)} onChange={x => set({ [key]: joinCsv(x) })}
+                    allOption={key === "workingDays" ? "All" : undefined}
+                    allOptionValues={key === "workingDays" ? WORKING_DAYS_ONLY : undefined} />;
             default:
                 return <MultiSelectAutoComplete key={key} {...common} options={["Active", "Inactive"]}
                     value={v ? "Active" : "Inactive"} onChange={x => set({ status: x === "Active" })} />;
@@ -127,21 +130,16 @@ export default function BranchFormFields({ data, set, errOf, onBlur, optionsData
 
     return (
         <>
-            {SECTIONS.map((s, i) => card(i + 1, s.title, s.sub, s.icon, <>
-                {s.pre && (
-                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2.5 }}>
-                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Working Days</Typography>
-                        {field(s.pre)}
-                    </Paper>
-                )}
-                <Box sx={{ ...gridStyle, gap: 1 }}>{s.fields.map(field)}</Box>
-            </>))}
-
+            {SECTIONS.map((s, i) => card(i + 1, s.title, s.sub, s.icon, (
+                <Box sx={{ ...gridStyle, width: "85%", mx: "auto" }}> {s.fields.map(field)} </Box>
+            )))}
             {card(5, "Documents & Remarks", "Optional supporting files and additional notes", <AttachFileIcon />, <>
-                <TextArea label="Remarks" name={`${prefix}remarks`} value={(d.remarks as string) || ""} onChange={e => set({ remarks: e.target.value })} />
-                <Box sx={{ ...gridStyle, mt: 2.5 }}>
+                <Box sx={{ width: "85%", mx: "auto" }}>
+                    <TextArea label="Remarks" name={`${prefix}remarks`} value={(d.remarks as string) || ""} onChange={e => set({ remarks: e.target.value })}/>
+                </Box>
+                <Box sx={{ ...gridStyle, mt: 2 }}>
                     {ATTACHMENTS.map(a => (
-                        <Paper variant="outlined" key={a.key} sx={{ p: 2, borderRadius: 2, borderStyle: "dashed", bgcolor: "action.hover" }}>
+                        <Paper variant="outlined" key={a.key} sx={{ p: 1.5, width: "75%", mx: "auto", boxSizing: "border-box", borderRadius: 2, borderStyle: "dashed", bgcolor: "action.hover" }}>
                             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                                 <AttachFileIcon color="primary" fontSize="small" />
                                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{a.label}</Typography>

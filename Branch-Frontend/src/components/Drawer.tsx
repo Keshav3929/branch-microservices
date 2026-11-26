@@ -13,7 +13,7 @@ interface DrawerProps {
 
 export default function Drawer({
     open, onClose, title, children, footer,
-    width = { xs: "100%", md: "60%" }
+    width = { xs: "100%", md: "50%" }
 }: DrawerProps) {
     const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -35,15 +35,7 @@ export default function Drawer({
             transitionDuration={0}
             slotProps={{
                 backdrop: { sx: { backgroundColor: "rgba(0, 0, 0, 0.25)" } },
-                paper: {
-                    sx: {
-                        width,
-                        minWidth: { xs: "100%", md: 620 },
-                        display: "flex",
-                        flexDirection: "column",
-                        boxShadow: "-4px 0 24px rgba(0, 0, 0, 0.15)"
-                    }
-                }
+                paper: { sx: { width, minWidth: { xs: "100%", md: 560 }, display: "flex", flexDirection: "column", boxShadow: "-4px 0 24px rgba(0, 0, 0, 0.15)" } }
             }}
         >
             <Box sx={{ width: "100%", bgcolor: "#0f172a", color: "#fff", flexShrink: 0, boxSizing: "border-box" }}>

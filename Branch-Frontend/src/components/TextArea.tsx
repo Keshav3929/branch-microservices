@@ -19,7 +19,7 @@ function TextArea({ label, name, value, onChange, onBlur, error = false, helperT
             fullWidth
             multiline
             minRows={rows}
-            margin="normal"
+            margin="dense"
             label={label}
             name={name}
             value={value}
