@@ -17,7 +17,7 @@ function TextField({ label, name, value, type, onChange, onBlur, error = false, 
     return (
         <MuiTextField
             fullWidth
-            margin="normal"
+            margin="dense"
             label={label}
             name={name}
             type={type}

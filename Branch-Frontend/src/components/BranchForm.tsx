@@ -111,9 +111,9 @@ export default function BranchFormFields({ data, set, errOf, onBlur, optionsData
     };
 
     const card = (n: number, title: string, sub: string, icon: ReactNode, body: ReactNode) => (
-        <Card key={title} variant="outlined" sx={{ mb: 2.5, borderRadius: 3, borderColor: "divider", overflow: "visible" }}>
-            <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-                <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2.5 }}>
+        <Card key={title} variant="outlined" sx={{ mb: 1.5, borderRadius: 2, borderColor: "divider", overflow: "visible" }}>
+            <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+                <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1.5 }}>
                     <Box sx={{ width: 42, height: 42, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "primary.main", color: "primary.contrastText", flexShrink: 0 }}>{icon}</Box>
                     <Box>
                         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{String(n).padStart(2, "0")}. {title}</Typography>
@@ -134,7 +134,7 @@ export default function BranchFormFields({ data, set, errOf, onBlur, optionsData
                         {field(s.pre)}
                     </Paper>
                 )}
-                <Box sx={gridStyle}>{s.fields.map(field)}</Box>
+                <Box sx={{ ...gridStyle, gap: 1 }}>{s.fields.map(field)}</Box>
             </>))}
 
             {card(5, "Documents & Remarks", "Optional supporting files and additional notes", <AttachFileIcon />, <>
