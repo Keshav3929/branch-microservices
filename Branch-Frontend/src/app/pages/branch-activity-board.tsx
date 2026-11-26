@@ -163,26 +163,31 @@ export default function BranchManagement() {
         request.unwrap().catch(e => { if (e?.name !== "AbortError") void showError("Error!", "Failed to load branches."); });
         return () => request.abort();
     }, [dispatch, query]);
-    // Fetch counts only for the currently selected scope
+    
+    const countDateFrom = scope === "date" ? applied.createdDateFrom : undefined;
+    const countDateTo = scope === "date" ? applied.createdDateTo : undefined;
+    // Fetch counts only when the selected count scope changes
     useEffect(() => {
         const controller = new AbortController();
         countsAbortRef.current = controller;
-
-        if (scope === "all") {
-            getCounts({}, controller.signal)
-                .then(({ data }) => { if (!controller.signal.aborted) setGlobalCounts(data); })
-                .catch(() => { });
-        } else {
-            const params = { createdDateFrom: applied.createdDateFrom || undefined, createdDateTo: applied.createdDateTo || undefined };
-            getCounts(params, controller.signal)
-                .then(({ data }) => { if (!controller.signal.aborted) setDateCounts(data); })
-                .catch(() => { });
-        }
+        const params = scope === "date" ? { createdDateFrom: countDateFrom || undefined, createdDateTo: countDateTo || undefined } : {};
+        getCounts(params, controller.signal)
+            .then(({ data }) => {
+                if (controller.signal.aborted) return;
+                if (scope === "all") {
+                    setGlobalCounts(data);
+                } else {
+                    setDateCounts(data);
+                }
+            })
+            .catch(() => { });
         return () => {
             controller.abort();
-            countsAbortRef.current = null;
+            if (countsAbortRef.current === controller) {
+                countsAbortRef.current = null;
+            }
         };
-    }, [scope, applied.createdDateFrom, applied.createdDateTo]);
+    }, [scope, countDateFrom, countDateTo]);
 
     // afterChange — Refresh counts for the currently selected scope
     const afterChange = () => {
@@ -219,6 +224,9 @@ export default function BranchManagement() {
         const f = defaults();
         const a = { ...f };
         if (scope === "all") { a.createdDateFrom = ""; a.createdDateTo = ""; }
+        const currentMode = modes[scope];
+        // Do nothing if filters are already at their default values
+        if (same(currentMode.filters, f) && same(currentMode.applied, a) && currentMode.datesApplied === (scope === "date")) { return; }
         patchMode({ filters: f, applied: a, datesApplied: scope === "date" });
         setSearchResetKey(k => k + 1);
         resetPage();
@@ -251,7 +259,7 @@ export default function BranchManagement() {
     };
     const removeChip = (chip: FilterChip) => {
         if (chip.key === "createdDateFrom" || chip.key === "createdDateTo") return;
-        
+
         const next: BranchFilters = { ...filters };
 
         if (chip.key === "search") {

@@ -10,7 +10,7 @@ import TextArea from "./TextArea";
 import Attachment from "./Attachment";
 import MultiSelectAutoComplete from "./MultiSelectAutoComplete";
 import { showError } from "./SweetAlert";
-import { splitCsv, joinCsv, pickId, gridStyle, type OptionItem, type OptionsData} from "../app/branchUtils";
+import { splitCsv, joinCsv, pickId, gridStyle, type OptionItem, type OptionsData } from "../app/branchUtils";
 
 // kinds: text | num (numeric id) | str (id kept as string) | pick (plain string) | multi (comma-separated) | status
 type Kind = "text" | "num" | "str" | "pick" | "multi" | "status";
@@ -66,7 +66,12 @@ export default function BranchFormFields({ data, set, errOf, onBlur, optionsData
 
     const field = ([kind, key, label, source]: Field) => {
         const msg = errOf(key);
-        const common = { label: stars || key === "status" ? label : label.replace(/\*$/, ""), error: !!msg, helperText: msg };
+        const common = {
+            label: stars || key === "status" ? label : label.replace(/\*$/, ""),
+            error: !!msg,
+            helperText: msg,
+            size: "small" as const
+        };
         const v = d[key];
         const list = (typeof source === "string" ? opt[source] : source ?? []);
 

@@ -75,6 +75,7 @@ export default function MultiSelectAutoComplete({
             renderInput={params => (
                 <MuiTextField
                     {...params}
+                    size={size}
                     label={label}
                     placeholder={placeholder}
                     error={error}
