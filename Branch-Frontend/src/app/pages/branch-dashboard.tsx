@@ -100,7 +100,7 @@ export default function BranchDashboard() {
     const [drilldownError, setDrilldownError] = useState(false);
     const drilldownRequestId = useRef(0);
     const initialLoadComplete = useRef(false);
-    // Creation Trends state
+    const initialFilters = useRef(appliedFilters);
     const [creationTrendsLevel, setCreationTrendsLevel] = useState<TrendLevel>("monthly");
     const [creationTrendsData, setCreationTrendsData] = useState<CreationTrendsResponse | null>(null);
     const [creationTrendsLoading, setCreationTrendsLoading] = useState(false);
@@ -227,7 +227,7 @@ export default function BranchDashboard() {
                 const [, , analyticsResult, countsResult] = await Promise.all([
                     dispatch(fetchDropdownOptions()).unwrap(),
                     dispatch(fetchUsers()).unwrap(),
-                    getAnalytics(buildSearchRequest(appliedFilters), controller.signal),
+                    getAnalytics(buildSearchRequest(initialFilters.current), controller.signal),
                     getCounts({}, controller.signal)
                 ]);
 
@@ -251,7 +251,7 @@ export default function BranchDashboard() {
         loadDashboard();
 
         return () => controller.abort();
-    }, [dispatch, appliedFilters, buildSearchRequest]);
+    }, [dispatch, buildSearchRequest]);
     // Filter change effect
     useEffect(() => {
         if (!initialLoadComplete.current) return;
@@ -310,13 +310,14 @@ export default function BranchDashboard() {
 
     const handleApplyFilters = (next?: BranchFilters) => {
         const target = next ? { ...next } : { ...filters };
+        if (JSON.stringify(target) === JSON.stringify(appliedFilters)) { return; }
         setFilters(target);
         setAppliedFilters(target);
     };
     const handleResetFilters = () => {
         const def = defaultFilters();
         setFilters(def);
-        setAppliedFilters(def);
+        if (JSON.stringify(def) !== JSON.stringify(appliedFilters)) { setAppliedFilters(def); }
     };
     // Remove a single applied filter chip
     const removeAppliedChip = (chip: FilterChip) => {
@@ -332,21 +333,11 @@ export default function BranchDashboard() {
     // KPI tiles update the dashboard's status filter; they never open a drilldown table.
     const handleTileClick = (type: "total" | "active" | "inactive") => {
         if (type === "total") {
-            const clearedFilters: BranchFilters = {
-                search: "",
-                branchType: [],
-                organizationId: [],
-                regionId: [],
-                countryId: [],
-                status: [],
-                createdDateFrom: "",
-                createdDateTo: ""
-            };
+            const clearedFilters: BranchFilters = { search: "", branchType: [], organizationId: [], regionId: [], countryId: [], status: [], createdDateFrom: "", createdDateTo: "" };
             setFilters(clearedFilters);
             setAppliedFilters(clearedFilters);
             return;
         }
-
         const status = [type === "active" ? "Active" : "Inactive"];
         const next = { ...appliedFilters, status };
         setFilters(next);
@@ -522,26 +513,8 @@ export default function BranchDashboard() {
 
             {failed && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>Failed to load dashboard data. Please try again.</Alert>}
 
-            {/* KPI Stat Tiles */}
-            <DashboardStatTiles
-                total={globalCounts.total}
-                active={globalCounts.active}
-                inactive={globalCounts.inactive}
-                activeStatusFilter={activeTileStatus}
-                onTileClick={handleTileClick}
-            />
-
-            {/* Search Filters Card */}
-            <DashboardFilterBar
-                filters={filters}
-                appliedFilters={appliedFilters}
-                setFilters={setFilters}
-                onApply={handleApplyFilters}
-                onReset={handleResetFilters}
-                optionsData={optionsData}
-            />
-
-            {/* Applied Filter Chips Bar */}
+            <DashboardStatTiles total={globalCounts.total} active={globalCounts.active} inactive={globalCounts.inactive} activeStatusFilter={activeTileStatus} onTileClick={handleTileClick} />
+            <DashboardFilterBar filters={filters} appliedFilters={appliedFilters} setFilters={setFilters} onApply={handleApplyFilters} onReset={handleResetFilters} optionsData={optionsData} />
             {appliedChips.length > 0 && (
                 <Paper elevation={0} sx={{ p: 1.5, mb: 2.5, bgcolor: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 3, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }} >
                     <Stack direction="row" spacing={1.5} alignItems="center" useFlexGap flexWrap="wrap">
@@ -551,10 +524,7 @@ export default function BranchDashboard() {
                         </Stack>
                         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ flex: 1, minWidth: 0 }}>
                             {appliedChips.map(chip => (
-                                <Chip key={`${chip.key}-${chip.value}`} label={chip.label} size="small" variant="outlined" color="primary"
-                                    onDelete={() => removeAppliedChip(chip)}
-                                    sx={{ borderRadius: 2, fontWeight: 600, bgcolor: "rgba(23, 50, 77, 0.05)", borderColor: "#cbd5e1", color: "#0f172a", "& .MuiChip-deleteIcon": { color: "#64748b", "&:hover": { color: "#d32f2f" } } }}
-                                />
+                                <Chip key={`${chip.key}-${chip.value}`} label={chip.label} size="small" variant="outlined" color="primary" onDelete={() => removeAppliedChip(chip)} sx={{ borderRadius: 2, fontWeight: 600, bgcolor: "rgba(23, 50, 77, 0.05)", borderColor: "#cbd5e1", color: "#0f172a", "& .MuiChip-deleteIcon": { color: "#64748b", "&:hover": { color: "#d32f2f" } } }} />
                             ))}
                         </Stack>
                         <Stack direction="row" spacing={0.5} alignItems="center">

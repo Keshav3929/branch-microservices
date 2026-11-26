@@ -163,29 +163,17 @@ export default function BranchManagement() {
         request.unwrap().catch(e => { if (e?.name !== "AbortError") void showError("Error!", "Failed to load branches."); });
         return () => request.abort();
     }, [dispatch, query]);
-    // Initial load — Both scopes load ONCE on mount
+    // Fetch counts only for the currently selected scope
     useEffect(() => {
         const controller = new AbortController();
         countsAbortRef.current = controller;
 
-        const params = {
-            createdDateFrom: applied.createdDateFrom || undefined,
-            createdDateTo: applied.createdDateTo || undefined
-        };
-
-        // Fetch global counts once.
-        getCounts({}, controller.signal)
-            .then(({ data }) => {
-                if (controller.signal.aborted) return;
-                setGlobalCounts(data);
-                // No date selected: both count sets are identical.
-                if (!params.createdDateFrom && !params.createdDateTo) {
-                    setDateCounts(data);
-                }
-            })
-            .catch(() => { });
-        // Fetch separate date-scoped counts only when a date is selected.
-        if (params.createdDateFrom || params.createdDateTo) {
+        if (scope === "all") {
+            getCounts({}, controller.signal)
+                .then(({ data }) => { if (!controller.signal.aborted) setGlobalCounts(data); })
+                .catch(() => { });
+        } else {
+            const params = { createdDateFrom: applied.createdDateFrom || undefined, createdDateTo: applied.createdDateTo || undefined };
             getCounts(params, controller.signal)
                 .then(({ data }) => { if (!controller.signal.aborted) setDateCounts(data); })
                 .catch(() => { });
@@ -194,49 +182,30 @@ export default function BranchManagement() {
             controller.abort();
             countsAbortRef.current = null;
         };
-    }, [applied.createdDateFrom, applied.createdDateTo]);
+    }, [scope, applied.createdDateFrom, applied.createdDateTo]);
 
-    // afterChange — Refresh BOTH count sets on every mutation
+    // afterChange — Refresh counts for the currently selected scope
     const afterChange = () => {
-        if (countsAbortRef.current) countsAbortRef.current.abort();
+        countsAbortRef.current?.abort();
         const controller = new AbortController();
         countsAbortRef.current = controller;
 
-        // Global counts (no dates) — for "Since Beginning"
-        getCounts({}, controller.signal).then(({ data }) => {
-            if (!controller.signal.aborted) setGlobalCounts(data);
-        }).catch(() => { });
-
-        // Date-scoped counts — for "By Chosen Date" (uses current applied dates)
-        const params = {
-            createdDateFrom: applied.createdDateFrom || undefined,
-            createdDateTo: applied.createdDateTo || undefined
-        };
-        getCounts(params, controller.signal).then(({ data }) => {
-            if (!controller.signal.aborted) setDateCounts(data);
-        }).catch(() => { });
-
+        if (scope === "all") {
+            getCounts({}, controller.signal)
+                .then(({ data }) => { if (!controller.signal.aborted) setGlobalCounts(data); })
+                .catch(() => { });
+        } else {
+            const params = { createdDateFrom: applied.createdDateFrom || undefined, createdDateTo: applied.createdDateTo || undefined };
+            getCounts(params, controller.signal)
+                .then(({ data }) => { if (!controller.signal.aborted) setDateCounts(data); })
+                .catch(() => { });
+        }
         setBranchesVersion(v => v + 1);
         dispatch(invalidateAnalytics());
         window.dispatchEvent(new Event("notifications-updated"));
     };
     const handleSaveSuccess = (saved: Branch[]) => { saved.filter(b => statusFilter === undefined || b.status === statusFilter).forEach(b => dispatch(setBranchLocally(b))); afterChange(); };
     const handleUpdateSuccess = (branch: Branch) => { dispatch(statusFilter !== undefined && branch.status !== statusFilter ? removeBranchLocally(branch.id) : setBranchLocally(branch)); afterChange(); };
-    // Explicit date range apply — refresh date counts only
-    const applyDateRange = () => {
-        if (scope !== "date") return;
-        if (countsAbortRef.current) countsAbortRef.current.abort();
-        const controller = new AbortController();
-        countsAbortRef.current = controller;
-        const params = {
-            createdDateFrom: applied.createdDateFrom || undefined,
-            createdDateTo: applied.createdDateTo || undefined
-        };
-        getCounts(params, controller.signal).then(({ data }) => {
-            if (!controller.signal.aborted) setDateCounts(data);
-        }).catch(() => { });
-    };
-
     const handleApplyFilters = (nextFilters?: BranchFilters) => {
         const target = nextFilters ? { ...nextFilters } : { ...filters };
         const trimmedSearch = target.search?.trim() || "";
@@ -244,7 +213,6 @@ export default function BranchManagement() {
 
         if (same(targetWithTrimmed, applied) && modes[scope].datesApplied) return;
         patchMode({ applied: { ...targetWithTrimmed }, datesApplied: true });
-        if (scope === "date") applyDateRange(); // Explicit date count refresh
         resetPage();
     };
     const handleResetFilters = () => {

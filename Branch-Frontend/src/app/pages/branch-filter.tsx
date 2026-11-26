@@ -30,17 +30,15 @@ interface SearchFormProps {
 
 const gridStyle = { display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" }, gap: 2 };
 
-export default function SearchForm({ filters, setFilters, onApply, onReset, showMoreFilters, setShowMoreFilters, optionsData, renderChips, renderBelowFilters
+export default function SearchForm({ filters, appliedFilters, setFilters, onApply, onReset, showMoreFilters, setShowMoreFilters, optionsData, renderChips, renderBelowFilters
 }: SearchFormProps) {
     const [errors, setErrors] = useState<Record<DateKey, string>>({ createdDateFrom: "", createdDateTo: "" });
     const [draftSearch, setDraftSearch] = useState(filters.search);
-
     const set = (patch: Partial<BranchFilters>) => setFilters(prev => ({ ...prev, ...patch }));
     const setError = (field: DateKey, msg: string) => setErrors(prev => ({ ...prev, [field]: msg }));
     const fromDate = parseDate(filters.createdDateFrom);
     const toDate = parseDate(filters.createdDateTo);
     const dates: Record<DateKey, Dayjs | null> = { createdDateFrom: fromDate, createdDateTo: toDate };
-
     // Single submit handler for Enter and Search icon
     const onSearchSubmit = () => {
         const trimmed = draftSearch.trim();
