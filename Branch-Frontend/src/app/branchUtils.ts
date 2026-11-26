@@ -96,7 +96,11 @@ export function getFilterChips(filters: BranchFilters, options: DropdownOptions)
                 return String(item.id) === String(val);
             });
             const display = match ? (typeof match === "string" ? match : match.name) : val;
-            chips.push({ key, value: val, label: `${label}: ${display}` });
+            chips.push({
+                key,
+                value: val,
+                label: `${label}: ${display}`
+            });
         });
     });
 

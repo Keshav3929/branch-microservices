@@ -184,8 +184,8 @@ export default function BranchDashboard() {
             getCounts({}, controller.signal)
         ])
             .then(([analyticsRes, countsRes]) => {
-                if (controller.signal.aborted) return;
-
+                if (controller.signal.aborted)
+                    return;
                 setAnalytics(analyticsRes.data);
                 setTotalFilteredCount(analyticsRes.data.total);
                 setGlobalCounts(countsRes.data);
@@ -220,7 +220,6 @@ export default function BranchDashboard() {
     ]);
 
     useEffect(() => {
-
         const controller = new AbortController();
         const loadDashboard = async () => {
             try {
@@ -230,9 +229,7 @@ export default function BranchDashboard() {
                     getAnalytics(buildSearchRequest(initialFilters.current), controller.signal),
                     getCounts({}, controller.signal)
                 ]);
-
                 if (controller.signal.aborted) return;
-
 
                 setAnalytics(analyticsResult.data);
                 setTotalFilteredCount(analyticsResult.data.total);
@@ -247,9 +244,7 @@ export default function BranchDashboard() {
                 if (!controller.signal.aborted) setLoading(false);
             }
         };
-
         loadDashboard();
-
         return () => controller.abort();
     }, [dispatch, buildSearchRequest]);
     // Filter change effect
@@ -281,7 +276,6 @@ export default function BranchDashboard() {
                     setLoading(false);
                 }
             });
-
         return () => controller.abort();
     }, [appliedFilters, buildSearchRequest]);
 
@@ -293,10 +287,7 @@ export default function BranchDashboard() {
         }
         const controller = new AbortController();
         trendAbortRef.current = controller;
-        const month = creationTrendsLevel === "weekly"
-            ? (weeklySelectedMonth || currentMonth)
-            : undefined;
-
+        const month = creationTrendsLevel === "weekly" ? (weeklySelectedMonth || currentMonth) : undefined;
         void fetchCreationTrends(creationTrendsLevel, appliedFilters, controller.signal, month);
         return () => controller.abort();
     }, [creationTrendsLevel, appliedFilters, weeklySelectedMonth, currentMonth, fetchCreationTrends]);
@@ -322,10 +313,15 @@ export default function BranchDashboard() {
     // Remove a single applied filter chip
     const removeAppliedChip = (chip: FilterChip) => {
         const next: BranchFilters = { ...appliedFilters };
+
         if (chip.key === "createdDateFrom" || chip.key === "createdDateTo") {
             next[chip.key] = "";
+        } else if (chip.key === "search") {
+            next.search = "";
         } else {
-            (next[chip.key] as (string | number)[]) = (next[chip.key] as (string | number)[]).filter(v => String(v) !== String(chip.value));
+            const values = (next[chip.key] as (string | number)[]) ?? [];
+            (next[chip.key] as (string | number)[]) =
+                values.filter(value => String(value) !== String(chip.value));
         }
         setFilters(next);
         setAppliedFilters(next);

@@ -251,14 +251,18 @@ export default function BranchManagement() {
     };
     const removeChip = (chip: FilterChip) => {
         if (chip.key === "createdDateFrom" || chip.key === "createdDateTo") return;
+        
         const next: BranchFilters = { ...filters };
+
         if (chip.key === "search") {
             next.search = "";
             setSearchResetKey(k => k + 1);
         } else {
-            (next[chip.key] as (string | number)[]) = (next[chip.key] as (string | number)[]).filter(v => String(v) !== String(chip.value));
+            const values = (next[chip.key] as (string | number)[]) ?? [];
+            (next[chip.key] as (string | number)[]) =
+                values.filter(value => String(value) !== String(chip.value));
         }
-        // Apply with the updated filters to clear applied search
+        setFilters(next);
         handleApplyFilters(next);
     };
     // ----------------------- Excel upload and validation -----------------------
