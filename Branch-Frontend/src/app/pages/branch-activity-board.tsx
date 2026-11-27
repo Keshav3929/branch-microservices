@@ -163,7 +163,6 @@ export default function BranchManagement() {
         request.unwrap().catch(e => { if (e?.name !== "AbortError") void showError("Error!", "Failed to load branches."); });
         return () => request.abort();
     }, [dispatch, query]);
-    
     const countDateFrom = scope === "date" ? applied.createdDateFrom : undefined;
     const countDateTo = scope === "date" ? applied.createdDateTo : undefined;
     // Fetch counts only when the selected count scope changes

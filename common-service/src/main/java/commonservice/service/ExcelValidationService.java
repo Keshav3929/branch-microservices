@@ -78,18 +78,17 @@ public class ExcelValidationService {
                     continue;
                 }
                 headers.add(header);
-                if (!uniqueHeaders.add(normalizeHeader(header))) {
+                String normalizedHeader = normalizeHeader(header);
+
+                if (!uniqueHeaders.add(normalizedHeader)) {
                     errors.add("Duplicate column header: " + header);
                 }
             }
 
-            Set<String> actualHeaders = new HashSet<>();
-            headers.forEach(header -> actualHeaders.add(normalizeHeader(header)));
-
             if (requiredHeaders != null) {
                 requiredHeaders.stream()
                         .filter(header -> header != null && !header.isBlank())
-                        .filter(header -> !actualHeaders.contains(normalizeHeader(header)))
+                        .filter(header -> !uniqueHeaders.contains(normalizeHeader(header)))
                         .forEach(header -> errors.add("Missing required header: " + header));
             }
             int dataRows = 0;
